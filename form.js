@@ -43,7 +43,7 @@
         // ============================================
         
         const CONFIG = {
-            workerUrl: 'https://poster-checkout.jack-7a4.workers.dev/',
+            workerUrl: 'https://poster-checkout.jack-7a4.workers.dev',
             successUrl: window.location.origin + '/success', // Change to your success page
             cancelUrl: window.location.origin, // Change to your cancel/home page
             
