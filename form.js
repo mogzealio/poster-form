@@ -46,7 +46,7 @@
             workerUrl: 'https://poster-checkout.jack-7a4.workers.dev',
             successUrl: window.location.origin + '/#success', // Change to your success page
             cancelUrl: window.location.origin, // Change to your cancel/home page
-            
+
             // Prices for display (should match your Stripe prices)
             prices: {
                 standard: { small: 25, medium: 35, large: 45 },
@@ -61,8 +61,9 @@
     const formState = {
         currentStep: 1,
         productType: null, // 'standard' or 'custom'
-        locationType: null, // 'eircode' or 'address'
-        locationValue: null,
+        locationType: null, // 'eircode' or 'townland'
+        locationValue: null, // NOW stores the townland ID!
+        townlandDisplay: null, // For showing to customer
         size: null, // 'small', 'medium', 'large'
         color: null // 'blue', 'green', 'red'
     };
@@ -72,70 +73,186 @@
     // ============================================
     
     // UPDATE THIS URL to point to your hosted locations.json file
-    const LOCATIONS_JSON_URL = 'https://pub-ddc543ba1c324125b2264e2dc4f23293.r2.dev/townland_locations.json';
-    
+    const LOCATIONS_JSON_URL = 'https://pub-ddc543ba1c324125b2264e2dc4f23293.r2.dev/townland_locations_with_ids.json';
+
     let locations = [];
-    let locationObjects = [];
     let fuse = null;
     let locationsLoaded = false;
     
-    // Load locations from external JSON file
+    // Load locations from external JSON file (NEW FORMAT with IDs)
     async function loadLocations() {
         try {
             const response = await fetch(LOCATIONS_JSON_URL);
             if (!response.ok) {
                 throw new Error('Failed to load locations');
             }
-            
+
             locations = await response.json();
-            
-            // Parse locations for searching
-            locationObjects = locations.map(fullAddress => ({
-                name: fullAddress.split(',')[0].trim(),
-                fullAddress: fullAddress
-            }));
-            
-            // Initialize Fuse.js for fuzzy search
-            fuse = new Fuse(locationObjects, {
+
+            // NEW: Locations are now objects with id, name, display, etc.
+            // Example: { id: "level10_stoops_a1b2", name: "Stoops", display: "Stoops, Shillelagh, Co. Wicklow" }
+
+            // Initialize Fuse.js for fuzzy search (search by name)
+            fuse = new Fuse(locations, {
                 threshold: 0.3,
-                keys: ['name']
+                keys: ['name'] // Search by townland name
             });
-            
+
             locationsLoaded = true;
-            console.log(`Loaded ${locations.length} locations`);
-            
+            console.log(`Loaded ${locations.length} locations with IDs`);
+
         } catch (error) {
             console.error('Error loading locations:', error);
-            // Fallback to sample data for testing
-            locations = [
-                "Dublin, Dublin City, Co. Dublin",
-                "Cork, Cork City, Co. Cork",
-                "Galway, Galway City, Co. Galway",
-                "Limerick, Limerick City, Co. Limerick",
-                "Waterford, Waterford City, Co. Waterford",
-                "Arklow, Arklow, Co. Wicklow",
-                "Killarney, Killarney, Co. Kerry",
-                "Tralee, Tralee, Co. Kerry"
-            ];
-            
-            locationObjects = locations.map(fullAddress => ({
-                name: fullAddress.split(',')[0].trim(),
-                fullAddress: fullAddress
-            }));
-            
-            fuse = new Fuse(locationObjects, {
-                threshold: 0.3,
-                keys: ['name']
-            });
-            
-            locationsLoaded = true;
-            console.warn('Using fallback sample locations');
+            alert('Failed to load townland data. Please refresh the page.');
         }
     }
     
     // Load locations when page loads
     loadLocations();
-    
+
+    // ============================================
+    // GOOGLE GEOCODING API - EIRCODE LOOKUP
+    // ============================================
+
+    async function lookupEircodeViaGoogle(eircode) {
+        /**
+         * Look up eircode via backend proxy (secure - API key hidden).
+         * Returns townland suggestion from Google's data.
+         */
+        try {
+            // Call our backend worker (not Google directly!)
+            const response = await fetch(`${CONFIG.workerUrl}/lookup-eircode`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ eircode })
+            });
+
+            if (!response.ok) {
+                console.warn('Backend lookup failed:', response.status);
+                return null;
+            }
+
+            const data = await response.json();
+
+            if (data.status !== 'OK') {
+                console.warn('Google API returned:', data.status);
+                return null;
+            }
+
+            const result = data.results[0];
+
+            // Extract townland from 'neighborhood' or 'locality' component
+            const townlandComponent = result.address_components.find(c =>
+                c.types.includes('neighborhood') || c.types.includes('locality')
+            );
+
+            if (!townlandComponent) {
+                console.warn('No townland found in Google response');
+                return null;
+            }
+
+            const googleTownland = townlandComponent.long_name;
+            console.log('Google suggested townland:', googleTownland);
+
+            // Search our locations for this townland
+            if (!fuse) {
+                console.warn('Locations not loaded yet');
+                return null;
+            }
+
+            const matches = fuse.search(googleTownland);
+
+            if (matches.length > 0) {
+                return {
+                    suggested: matches[0].item, // Full location object with ID
+                    googleName: googleTownland,
+                    allMatches: matches.slice(0, 5) // Top 5 in case of multiple
+                };
+            }
+
+            console.warn('No matching townland found in our data for:', googleTownland);
+            return null;
+
+        } catch (error) {
+            console.error('Eircode lookup failed:', error);
+            return null;
+        }
+    }
+
+    async function showTownlandSuggestion(eircode) {
+        /**
+         * Look up eircode and show suggestion to customer.
+         */
+        const suggestionDiv = document.getElementById('townlandSuggestion');
+        if (!suggestionDiv) {
+            console.error('townlandSuggestion div not found in HTML!');
+            return;
+        }
+
+        suggestionDiv.innerHTML = '<div class="loading">🔍 Looking up your townland...</div>';
+        suggestionDiv.classList.add('active');
+
+        const result = await lookupEircodeViaGoogle(eircode);
+
+        if (result && result.suggested) {
+            const location = result.suggested;
+
+            suggestionDiv.innerHTML = `
+                <div class="suggestion-box">
+                    <p class="suggestion-label">📍 We found your townland:</p>
+                    <p class="suggestion-townland"><strong>${location.display}</strong></p>
+                    <div class="suggestion-buttons">
+                        <button type="button" class="btn btn-confirm" data-location-id="${location.id}">
+                            ✓ That's correct
+                        </button>
+                        <button type="button" class="btn btn-change">
+                            ✗ No, let me search
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // Handle confirmation
+            suggestionDiv.querySelector('.btn-confirm').addEventListener('click', function() {
+                // Store the townland ID (this is the key!)
+                formState.locationType = 'townland';
+                formState.locationValue = location.id; // Custom ID for backend!
+                formState.townlandDisplay = location.display; // For display
+
+                console.log('Customer confirmed townland:', location.id);
+
+                updateStep2Button();
+                suggestionDiv.classList.remove('active');
+
+                // Visual feedback
+                const eircodeInput = document.getElementById('eircodeInput');
+                eircodeInput.style.borderColor = '#28a745';
+                setTimeout(() => eircodeInput.style.borderColor = '', 2000);
+            });
+
+            // Handle manual search
+            suggestionDiv.querySelector('.btn-change').addEventListener('click', function() {
+                suggestionDiv.classList.remove('active');
+                // Switch to address search tab
+                document.querySelector('.location-tab[data-tab="address"]').click();
+            });
+
+        } else {
+            suggestionDiv.innerHTML = `
+                <div class="suggestion-warning">
+                    <p>⚠️ Could not automatically find your townland.</p>
+                    <p>Please search manually using the "Search Townlands" tab.</p>
+                    <button type="button" class="btn btn-change">Search Manually</button>
+                </div>
+            `;
+
+            suggestionDiv.querySelector('.btn-change').addEventListener('click', function() {
+                suggestionDiv.classList.remove('active');
+                document.querySelector('.location-tab[data-tab="address"]').click();
+            });
+        }
+    }
+
     // ============================================
     // STEP NAVIGATION
     // ============================================
@@ -240,29 +357,42 @@
             // Update state
             formState.locationType = tabType;
             formState.locationValue = null;
-            
+            formState.townlandDisplay = null;
+
             // Clear inputs
             document.getElementById('eircodeInput').value = '';
             document.getElementById('addressInput').value = '';
             document.getElementById('autocompleteResults').classList.remove('active');
-            
+            document.getElementById('townlandSuggestion').classList.remove('active');
+
             updateStep2Button();
         });
     });
     
-    // Eircode input
+    // Eircode input - AUTO LOOKUP when complete
     document.getElementById('eircodeInput').addEventListener('input', function(e) {
         let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-        
+
         // Format as A65 F4E2
         if (value.length > 3) {
             value = value.slice(0, 3) + ' ' + value.slice(3, 7);
         }
-        
+
         this.value = value;
-        formState.locationType = 'eircode';
-        formState.locationValue = value;
-        updateStep2Button();
+
+        // Auto-lookup when eircode is complete
+        if (value.replace(/\s/g, '').length === 7) {
+            showTownlandSuggestion(value);
+        } else {
+            // Clear suggestion if editing
+            const suggestionDiv = document.getElementById('townlandSuggestion');
+            if (suggestionDiv) {
+                suggestionDiv.classList.remove('active');
+            }
+            formState.locationValue = null;
+            formState.townlandDisplay = null;
+            updateStep2Button();
+        }
     });
     
     // Address autocomplete
@@ -283,28 +413,31 @@
         if (query.length < 2) {
             resultsDiv.classList.remove('active');
             formState.locationValue = null;
+            formState.townlandDisplay = null;
             updateStep2Button();
             return;
         }
-        
-        // Search locations
+
+        // Search locations (now searches by 'name' key in object)
         const searchResults = fuse.search(query);
         currentResults = searchResults.slice(0, 10);
-        
+
         if (currentResults.length === 0) {
             resultsDiv.innerHTML = '<div class="autocomplete-item">No locations found</div>';
             resultsDiv.classList.add('active');
             formState.locationValue = null;
+            formState.townlandDisplay = null;
             updateStep2Button();
             return;
         }
-        
-        // Display results
+
+        // Display results using 'display' property
         const html = currentResults.map((result, index) => {
-            const parts = result.item.fullAddress.split(',');
+            const location = result.item;
+            const parts = location.display.split(',');
             const locationName = parts[0].trim();
             const details = parts.slice(1).join(',').trim();
-            
+
             return `
                 <div class="autocomplete-item" data-index="${index}">
                     <strong>${locationName}</strong>
@@ -322,33 +455,35 @@
             item.addEventListener('click', function() {
                 const index = parseInt(this.dataset.index);
                 if (!isNaN(index)) {
-                    selectLocation(currentResults[index].item.fullAddress);
+                    selectLocation(currentResults[index].item); // Pass full object
                 }
             });
         });
     });
-    
-    function selectLocation(fullAddress) {
-        document.getElementById('addressInput').value = fullAddress;
+
+    function selectLocation(location) {
+        /**
+         * CHANGED: Now stores location.id instead of display string
+         */
+        document.getElementById('addressInput').value = location.display;
         document.getElementById('autocompleteResults').classList.remove('active');
-        formState.locationType = 'address';
-        formState.locationValue = fullAddress;
+
+        formState.locationType = 'townland';
+        formState.locationValue = location.id; // Store ID!
+        formState.townlandDisplay = location.display; // For display
+
+        console.log('Customer selected townland:', location.id);
+
         updateStep2Button();
     }
     
     function updateStep2Button() {
+        /**
+         * UPDATED: Simply check if we have a townland ID
+         * The ID is set when customer confirms Google suggestion or selects manually
+         */
         const btn = document.getElementById('step2Next');
-        
-        if (formState.locationType === 'eircode') {
-            // Valid eircode format: XXX XXXX (7 chars without space)
-            const eircode = formState.locationValue || '';
-            const isValid = eircode.replace(/\s/g, '').length === 7;
-            btn.disabled = !isValid;
-        } else if (formState.locationType === 'address') {
-            btn.disabled = !formState.locationValue;
-        } else {
-            btn.disabled = true;
-        }
+        btn.disabled = !formState.locationValue; // Enable if we have a townland ID
     }
     
     document.getElementById('step2Back').addEventListener('click', () => goToStep(1));
@@ -437,8 +572,8 @@
                 productType: formState.productType,
                 size: formState.size,
                 color: formState.color,
-                locationType: formState.locationType,
-                locationValue: formState.locationValue,
+                townlandId: formState.locationValue, // NEW: Custom ID for backend!
+                townlandDisplay: formState.townlandDisplay, // NEW: For emails/display
                 successUrl: CONFIG.successUrl,
                 cancelUrl: CONFIG.cancelUrl
             };
