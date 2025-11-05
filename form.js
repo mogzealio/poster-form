@@ -100,21 +100,7 @@
         },
 
         updateUI() {
-            const cartDisplay = document.getElementById('cartDisplay');
-            const cartCount = document.getElementById('cartCount');
-
-            if (!cartDisplay) return;
-
-            if (this.items.length === 0) {
-                cartDisplay.classList.remove('active');
-                return;
-            }
-
-            cartDisplay.classList.add('active');
-            if (cartCount) {
-                cartCount.textContent = this.items.length;
-            }
-
+            // Update cart items display
             const cartItems = document.getElementById('cartItems');
             if (cartItems) {
                 cartItems.innerHTML = this.items.map((item, index) => {
@@ -144,6 +130,7 @@
                 });
             }
 
+            // Update cart total
             const cartTotal = document.getElementById('cartTotal');
             if (cartTotal) {
                 cartTotal.textContent = `€${this.getTotalPrice()}`;
