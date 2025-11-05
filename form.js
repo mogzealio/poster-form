@@ -676,9 +676,9 @@
             'rhubarb': 'https://mogzealio.github.io/poster-form/images/standard-rhubarb-preview.jpg'
         },
         custom: {
-            'default': 'https://mogzealio.github.io/poster-form/images/custom-sailboat-preview.jpg',
-            'green': 'https://mogzealio.github.io/poster-form/images/custom-mossy-preview.jpg',
-            'rhubarb': 'https://mogzealio.github.io/poster-form/images/custom-rhubarb-preview.jpg'
+            'default': 'https://mogzealio.github.io/poster-form/images/custom-sailboat-preview-02.jpg',
+            'green': 'https://mogzealio.github.io/poster-form/images/custom-mossy-preview-02.jpg',
+            'rhubarb': 'https://mogzealio.github.io/poster-form/images/custom-rhubarb-preview-03.jpg'
         }
     };
     
