@@ -374,23 +374,23 @@
         
         // Pre-select defaults when reaching step 3
         if (step === 3) {
-            // Pre-select small size if nothing selected
+            // Pre-select medium size if nothing selected
             if (!formState.size) {
-                formState.size = 'small';
-                const smallOption = document.querySelector('[data-size="small"]');
-                if (smallOption) {
-                    smallOption.classList.add('selected');
+                formState.size = 'medium';
+                const mediumOption = document.querySelector('[data-size="medium"]');
+                if (mediumOption) {
+                    mediumOption.classList.add('selected');
                 }
             }
-            
-            // Pre-select sailboat color if nothing selected
+
+            // Pre-select green color if nothing selected
             if (!formState.color) {
-                formState.color = 'default';
-                const defaultOption = document.querySelector('[data-color="default"]');
-                if (defaultOption) {
-                    defaultOption.classList.add('selected');
+                formState.color = 'green';
+                const greenOption = document.querySelector('[data-color="green"]');
+                if (greenOption) {
+                    greenOption.classList.add('selected');
                 }
-                updateColorPreview('default');
+                updateColorPreview('green');
             }
             
             // Update price display and button state
@@ -603,14 +603,12 @@
         standard: {
             'default': 'https://mogzealio.github.io/poster-form/images/standard-sailboat-preview.jpg',
             'green': 'https://mogzealio.github.io/poster-form/images/standard-mossy-preview.jpg',
-            'gold': 'https://mogzealio.github.io/poster-form/images/standard-golden-preview.jpg',
-            'rhubarb': 'https://mogzealio.github.io/poster-form/images/standard-rhubarb-preview-02.jpg'
+            'rhubarb': 'https://mogzealio.github.io/poster-form/images/standard-rhubarb-preview.jpg'
         },
         custom: {
             'default': 'https://mogzealio.github.io/poster-form/images/custom-sailboat-preview.jpg',
             'green': 'https://mogzealio.github.io/poster-form/images/custom-mossy-preview.jpg',
-            'gold': 'https://mogzealio.github.io/poster-form/images/custom-golden-preview.jpg',
-            'rhubarb': 'https://mogzealio.github.io/poster-form/images/custom-rhubarb-preview-02.jpg'
+            'rhubarb': 'https://mogzealio.github.io/poster-form/images/custom-rhubarb-preview.jpg'
         }
     };
     
