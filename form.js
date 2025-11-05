@@ -604,13 +604,13 @@
             'default': 'https://mogzealio.github.io/poster-form/images/standard-sailboat-preview.jpg',
             'green': 'https://mogzealio.github.io/poster-form/images/standard-mossy-preview.jpg',
             'gold': 'https://mogzealio.github.io/poster-form/images/standard-golden-preview.jpg',
-            'rhubarb': 'https://mogzealio.github.io/poster-form/images/standard-rhubarb-preview.jpg'
+            'rhubarb': 'https://mogzealio.github.io/poster-form/images/standard-rhubarb-preview-02.jpg'
         },
         custom: {
             'default': 'https://mogzealio.github.io/poster-form/images/custom-sailboat-preview.jpg',
             'green': 'https://mogzealio.github.io/poster-form/images/custom-mossy-preview.jpg',
             'gold': 'https://mogzealio.github.io/poster-form/images/custom-golden-preview.jpg',
-            'rhubarb': 'https://mogzealio.github.io/poster-form/images/custom-rhubarb-preview.jpg'
+            'rhubarb': 'https://mogzealio.github.io/poster-form/images/custom-rhubarb-preview-02.jpg'
         }
     };
     
