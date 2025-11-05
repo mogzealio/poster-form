@@ -114,10 +114,27 @@
     // GOOGLE GEOCODING API - EIRCODE LOOKUP
     // ============================================
 
+    /**
+     * Calculate distance between two lat/lng points using Haversine formula
+     * Returns distance in kilometers
+     */
+    function calculateDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371; // Earth's radius in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a =
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
     async function lookupEircodeViaGoogle(eircode) {
         /**
          * Look up eircode via backend proxy (secure - API key hidden).
          * Returns townland suggestion from Google's data.
+         * Now includes distance filtering to avoid false matches.
          */
         try {
             // Call our backend worker (not Google directly!)
@@ -141,6 +158,11 @@
 
             const result = data.results[0];
 
+            // Extract coordinates from Google's geocoded location
+            const googleLat = result.geometry.location.lat;
+            const googleLng = result.geometry.location.lng;
+            console.log('Google geocoded to:', googleLat, googleLng);
+
             // Extract townland from 'neighborhood' or 'locality' component
             const townlandComponent = result.address_components.find(c =>
                 c.types.includes('neighborhood') || c.types.includes('locality')
@@ -162,15 +184,75 @@
 
             const matches = fuse.search(googleTownland);
 
-            if (matches.length > 0) {
+            if (matches.length === 0) {
+                console.warn('No matching townland found in our data for:', googleTownland);
+                return null;
+            }
+
+            // NEW: Filter matches by distance (25km radius)
+            const MAX_DISTANCE_KM = 25;
+            const nearbyMatches = matches.filter(match => {
+                const location = match.item;
+                if (!location.lat || !location.lng) {
+                    return false; // Skip if no coordinates
+                }
+                const distance = calculateDistance(
+                    googleLat, googleLng,
+                    location.lat, location.lng
+                );
+                console.log(`  ${location.display}: ${distance.toFixed(1)}km away`);
+                return distance <= MAX_DISTANCE_KM;
+            });
+
+            if (nearbyMatches.length > 0) {
+                // Sort by distance and return closest
+                nearbyMatches.sort((a, b) => {
+                    const distA = calculateDistance(googleLat, googleLng, a.item.lat, a.item.lng);
+                    const distB = calculateDistance(googleLat, googleLng, b.item.lat, b.item.lng);
+                    return distA - distB;
+                });
+
+                const closest = nearbyMatches[0].item;
                 return {
-                    suggested: matches[0].item, // Full location object with ID
+                    suggested: closest,
                     googleName: googleTownland,
-                    allMatches: matches.slice(0, 5) // Top 5 in case of multiple
+                    allMatches: nearbyMatches.slice(0, 5),
+                    distance: calculateDistance(googleLat, googleLng, closest.lat, closest.lng),
+                    matchType: 'text' // Matched by name
                 };
             }
 
-            console.warn('No matching townland found in our data for:', googleTownland);
+            // NEW: Fallback to pure geographic search
+            console.log(`No text matches within ${MAX_DISTANCE_KM}km, searching by location only...`);
+
+            if (!locationsLoaded || locations.length === 0) {
+                console.warn('Locations not loaded for geographic search');
+                return null;
+            }
+
+            // Find all townlands within radius, sorted by distance
+            const allNearby = locations
+                .map(loc => ({
+                    location: loc,
+                    distance: calculateDistance(googleLat, googleLng, loc.lat, loc.lng)
+                }))
+                .filter(item => item.distance <= MAX_DISTANCE_KM)
+                .sort((a, b) => a.distance - b.distance);
+
+            if (allNearby.length > 0) {
+                const nearest = allNearby[0];
+                console.log(`Found nearest townland: ${nearest.location.display} (${nearest.distance.toFixed(1)}km away)`);
+
+                return {
+                    suggested: nearest.location,
+                    googleName: googleTownland,
+                    allMatches: allNearby.slice(0, 5).map(item => ({ item: item.location })),
+                    distance: nearest.distance,
+                    matchType: 'geographic' // Matched by location only
+                };
+            }
+
+            console.warn(`No townlands found within ${MAX_DISTANCE_KM}km of coordinates`);
             return null;
 
         } catch (error) {
@@ -196,11 +278,23 @@
 
         if (result && result.suggested) {
             const location = result.suggested;
+            const isGeographicMatch = result.matchType === 'geographic';
+            const distanceText = result.distance ? ` (${result.distance.toFixed(1)}km away)` : '';
+
+            // Different messaging for text match vs geographic match
+            let label, townlandText;
+            if (isGeographicMatch) {
+                label = 'We found the nearest townland to your location:';
+                townlandText = `<strong>${location.display}</strong>${distanceText}`;
+            } else {
+                label = 'We think this is your townland:';
+                townlandText = `<strong>${location.display}</strong>`;
+            }
 
             suggestionDiv.innerHTML = `
                 <div class="suggestion-box">
-                    <p class="suggestion-label">📍 We found your townland:</p>
-                    <p class="suggestion-townland"><strong>${location.display}</strong></p>
+                    <p class="suggestion-label">${label}</p>
+                    <p class="suggestion-townland">${townlandText}</p>
                     <div class="suggestion-buttons">
                         <button type="button" class="btn btn-confirm" data-location-id="${location.id}">
                             ✓ That's correct
