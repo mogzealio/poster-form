@@ -73,7 +73,7 @@
     // ============================================
     
     // UPDATE THIS URL to point to your hosted locations.json file
-    const LOCATIONS_JSON_URL = 'https://pub-ddc543ba1c324125b2264e2dc4f23293.r2.dev/townland_locations_with_ids.json?v=2';
+    const LOCATIONS_JSON_URL = 'https://pub-ddc543ba1c324125b2264e2dc4f23293.r2.dev/townland_locations_with_ids.json?v=3';
 
     let locations = [];
     let fuse = null;
@@ -176,54 +176,48 @@
             const googleTownland = townlandComponent.long_name;
             console.log('Google suggested townland:', googleTownland);
 
-            // Search our locations for this townland
-            if (!fuse) {
+            // Check for locations loaded
+            if (!locationsLoaded || locations.length === 0) {
                 console.warn('Locations not loaded yet');
                 return null;
             }
 
-            const matches = fuse.search(googleTownland);
-
-            if (matches.length === 0) {
-                console.warn('No matching townland found in our data for:', googleTownland);
-                return null;
-            }
-
-            // NEW: Filter matches by distance (25km radius)
             const MAX_DISTANCE_KM = 25;
-            const nearbyMatches = matches.filter(match => {
-                const location = match.item;
-                if (!location.lat || !location.lng) {
-                    return false; // Skip if no coordinates
-                }
-                const distance = calculateDistance(
-                    googleLat, googleLng,
-                    location.lat, location.lng
-                );
-                console.log(`  ${location.display}: ${distance.toFixed(1)}km away`);
-                return distance <= MAX_DISTANCE_KM;
+
+            // Step 1: Try EXACT name match within radius (case-insensitive)
+            const exactMatches = locations.filter(loc => {
+                if (!loc.lat || !loc.lng) return false;
+
+                const distance = calculateDistance(googleLat, googleLng, loc.lat, loc.lng);
+                if (distance > MAX_DISTANCE_KM) return false;
+
+                // Check exact match (case-insensitive)
+                return loc.name.toLowerCase() === googleTownland.toLowerCase();
             });
 
-            if (nearbyMatches.length > 0) {
-                // Sort by distance and return closest
-                nearbyMatches.sort((a, b) => {
-                    const distA = calculateDistance(googleLat, googleLng, a.item.lat, a.item.lng);
-                    const distB = calculateDistance(googleLat, googleLng, b.item.lat, b.item.lng);
+            if (exactMatches.length > 0) {
+                // Sort by distance and return closest exact match
+                exactMatches.sort((a, b) => {
+                    const distA = calculateDistance(googleLat, googleLng, a.lat, a.lng);
+                    const distB = calculateDistance(googleLat, googleLng, b.lat, b.lng);
                     return distA - distB;
                 });
 
-                const closest = nearbyMatches[0].item;
+                const closest = exactMatches[0];
+                const distance = calculateDistance(googleLat, googleLng, closest.lat, closest.lng);
+                console.log(`Exact match found: ${closest.display} (${distance.toFixed(1)}km away)`);
+
                 return {
                     suggested: closest,
                     googleName: googleTownland,
-                    allMatches: nearbyMatches.slice(0, 5),
-                    distance: calculateDistance(googleLat, googleLng, closest.lat, closest.lng),
-                    matchType: 'text' // Matched by name
+                    allMatches: exactMatches.slice(0, 5).map(loc => ({ item: loc })),
+                    distance: distance,
+                    matchType: 'exact' // Exact name match
                 };
             }
 
-            // NEW: Fallback to pure geographic search
-            console.log(`No text matches within ${MAX_DISTANCE_KM}km, searching by location only...`);
+            // Step 2: No exact match - fallback to pure geographic search
+            console.log(`No exact match for "${googleTownland}", searching by location only...`);
 
             if (!locationsLoaded || locations.length === 0) {
                 console.warn('Locations not loaded for geographic search');
@@ -278,15 +272,21 @@
 
         if (result && result.suggested) {
             const location = result.suggested;
-            const isGeographicMatch = result.matchType === 'geographic';
+            const matchType = result.matchType;
             const distanceText = result.distance ? ` (${result.distance.toFixed(1)}km away)` : '';
 
-            // Different messaging for text match vs geographic match
+            // Different messaging based on match type
             let label, townlandText;
-            if (isGeographicMatch) {
+            if (matchType === 'exact') {
+                // Exact name match - high confidence
+                label = 'We think this is your townland:';
+                townlandText = `<strong>${location.display}</strong>`;
+            } else if (matchType === 'geographic') {
+                // Geographic fallback - show distance
                 label = 'We found the nearest townland to your location:';
                 townlandText = `<strong>${location.display}</strong>${distanceText}`;
             } else {
+                // Fallback for any other case
                 label = 'We think this is your townland:';
                 townlandText = `<strong>${location.display}</strong>`;
             }
