@@ -67,6 +67,89 @@
         size: null, // 'small', 'medium', 'large'
         color: null // 'blue', 'green', 'red'
     };
+
+    // Cart state for multi-poster checkout
+    const cart = {
+        items: [],
+
+        addItem(item) {
+            this.items.push(item);
+            this.updateUI();
+            console.log('Added to cart:', item);
+            console.log('Cart now has', this.items.length, 'items');
+        },
+
+        removeItem(index) {
+            this.items.splice(index, 1);
+            this.updateUI();
+            console.log('Removed item at index', index);
+            console.log('Cart now has', this.items.length, 'items');
+        },
+
+        clear() {
+            this.items = [];
+            this.updateUI();
+            console.log('Cart cleared');
+        },
+
+        getTotalPrice() {
+            return this.items.reduce((total, item) => {
+                const price = CONFIG.prices[item.productType][item.size];
+                return total + price;
+            }, 0);
+        },
+
+        updateUI() {
+            const cartDisplay = document.getElementById('cartDisplay');
+            const cartCount = document.getElementById('cartCount');
+
+            if (!cartDisplay) return;
+
+            if (this.items.length === 0) {
+                cartDisplay.classList.remove('active');
+                return;
+            }
+
+            cartDisplay.classList.add('active');
+            if (cartCount) {
+                cartCount.textContent = this.items.length;
+            }
+
+            const cartItems = document.getElementById('cartItems');
+            if (cartItems) {
+                cartItems.innerHTML = this.items.map((item, index) => {
+                    const price = CONFIG.prices[item.productType][item.size];
+                    const sizeLabel = {small: 'A3', medium: 'A2', large: 'A1'}[item.size];
+                    const typeLabel = item.productType === 'custom' ? 'Custom' : 'Standard';
+                    const location = item.townlandDisplay ? ` - ${item.townlandDisplay}` : '';
+
+                    return `
+                        <div class="cart-item">
+                            <div class="cart-item-details">
+                                <strong>${typeLabel} ${sizeLabel}</strong>
+                                <div class="cart-item-meta">${item.color}${location}</div>
+                            </div>
+                            <div class="cart-item-price">€${price}</div>
+                            <button type="button" class="cart-item-remove" data-index="${index}">✕</button>
+                        </div>
+                    `;
+                }).join('');
+
+                // Add remove handlers
+                document.querySelectorAll('.cart-item-remove').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const index = parseInt(this.dataset.index);
+                        cart.removeItem(index);
+                    });
+                });
+            }
+
+            const cartTotal = document.getElementById('cartTotal');
+            if (cartTotal) {
+                cartTotal.textContent = `€${this.getTotalPrice()}`;
+            }
+        }
+    };
     
     // ============================================
     // LOCATION DATA - Loaded from External File
@@ -652,34 +735,87 @@
     });
     
     // ============================================
-    // CHECKOUT
+    // CART & CHECKOUT
     // ============================================
-    
-    document.getElementById('step3Checkout').addEventListener('click', async () => {
-        goToStep('loading');
-        
-        try {
-            // Prepare checkout data
-            const checkoutData = {
-                productType: formState.productType,
-                size: formState.size,
-                color: formState.color,
-                townlandId: formState.locationValue, // NEW: Custom ID for backend!
-                townlandDisplay: formState.townlandDisplay, // NEW: For emails/display
-                successUrl: CONFIG.successUrl,
-                cancelUrl: CONFIG.cancelUrl
-            };
-            
-            console.log('Sending checkout request:', checkoutData);
-            
-            // Call Cloudflare Worker to create checkout session
-            const response = await fetch(`${CONFIG.workerUrl}/create-checkout`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(checkoutData)
+
+    // Add to Cart button
+    document.getElementById('step3Checkout').addEventListener('click', () => {
+        // Add current selection to cart
+        const cartItem = {
+            productType: formState.productType,
+            size: formState.size,
+            color: formState.color,
+            townlandId: formState.locationValue,
+            townlandDisplay: formState.townlandDisplay
+        };
+
+        cart.addItem(cartItem);
+
+        // Show success message and cart options
+        showCartOptions();
+    });
+
+    function showCartOptions() {
+        // Hide Step 3, show cart options screen
+        document.querySelectorAll('.form-step').forEach(s => s.classList.remove('active'));
+
+        const cartOptionsDiv = document.getElementById('cartOptions');
+        if (cartOptionsDiv) {
+            cartOptionsDiv.classList.add('active');
+        }
+    }
+
+    // Add Another Poster button
+    const addAnotherBtn = document.getElementById('addAnotherPoster');
+    if (addAnotherBtn) {
+        addAnotherBtn.addEventListener('click', () => {
+            // Reset form state
+            formState.productType = null;
+            formState.locationType = null;
+            formState.locationValue = null;
+            formState.townlandDisplay = null;
+            formState.size = null;
+            formState.color = null;
+
+            // Clear selections
+            document.querySelectorAll('[data-product], .size-option, .color-option').forEach(el => {
+                el.classList.remove('selected');
             });
+
+            // Go back to Step 1
+            goToStep(1);
+        });
+    }
+
+    // Proceed to Checkout button
+    const proceedCheckoutBtn = document.getElementById('proceedToCheckout');
+    if (proceedCheckoutBtn) {
+        proceedCheckoutBtn.addEventListener('click', async () => {
+            if (cart.items.length === 0) {
+                alert('Your cart is empty!');
+                return;
+            }
+
+            goToStep('loading');
+
+            try {
+                // Prepare checkout data with cart items
+                const checkoutData = {
+                    cartItems: cart.items,
+                    successUrl: CONFIG.successUrl,
+                    cancelUrl: CONFIG.cancelUrl
+                };
+
+                console.log('Sending checkout request:', checkoutData);
+
+                // Call Cloudflare Worker to create checkout session
+                const response = await fetch(`${CONFIG.workerUrl}/create-checkout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(checkoutData)
+                });
             
             console.log('Response status:', response.status);
             
@@ -706,22 +842,29 @@
                 throw new Error('No checkout URL received');
             }
             
-            // Redirect to Stripe Checkout
-            console.log('Redirecting to:', data.url);
-            window.location.href = data.url;
-            
-        } catch (error) {
-            console.error('Checkout error:', error);
-            console.error('Error details:', error.message);
-            goToStep(3);
-            
-            const errorMsg = document.getElementById('errorMessage');
-            errorMsg.textContent = `Error: ${error.message}. Please try again.`;
-            errorMsg.classList.add('active');
-            
-            setTimeout(() => errorMsg.classList.remove('active'), 5000);
-        }
-    });
+                // Redirect to Stripe Checkout
+                console.log('Redirecting to:', data.url);
+                window.location.href = data.url;
+
+            } catch (error) {
+                console.error('Checkout error:', error);
+                console.error('Error details:', error.message);
+
+                // Go back to cart options on error
+                const cartOptionsDiv = document.getElementById('cartOptions');
+                if (cartOptionsDiv) {
+                    cartOptionsDiv.classList.add('active');
+                }
+
+                const errorMsg = document.getElementById('errorMessage');
+                if (errorMsg) {
+                    errorMsg.textContent = `Error: ${error.message}. Please try again.`;
+                    errorMsg.classList.add('active');
+                    setTimeout(() => errorMsg.classList.remove('active'), 5000);
+                }
+            }
+        });
+    }
     
     // Close autocomplete when clicking outside
     document.addEventListener('click', (e) => {
