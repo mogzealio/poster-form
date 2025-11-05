@@ -73,7 +73,7 @@
     // ============================================
     
     // UPDATE THIS URL to point to your hosted locations.json file
-    const LOCATIONS_JSON_URL = 'https://pub-ddc543ba1c324125b2264e2dc4f23293.r2.dev/townland_locations_with_ids.json';
+    const LOCATIONS_JSON_URL = 'https://pub-ddc543ba1c324125b2264e2dc4f23293.r2.dev/townland_locations_with_ids.json?v=2';
 
     let locations = [];
     let fuse = null;
