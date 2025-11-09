@@ -65,7 +65,8 @@
         locationValue: null, // NOW stores the townland ID!
         townlandDisplay: null, // For showing to customer
         size: null, // 'small', 'medium', 'large'
-        color: null // 'blue', 'green', 'red'
+        color: null, // 'blue', 'green', 'red'
+        shippingCountry: null // 'IE', 'GB', 'EU', 'US', 'CA'
     };
 
     // Cart state for multi-poster checkout
@@ -776,7 +777,60 @@
         });
     }
 
-    // Proceed to Checkout button
+    // Proceed to Shipping button (from cart)
+    const proceedShippingBtn = document.getElementById('proceedToShipping');
+    if (proceedShippingBtn) {
+        proceedShippingBtn.addEventListener('click', () => {
+            if (cart.items.length === 0) {
+                alert('Your cart is empty!');
+                return;
+            }
+
+            // Show shipping selection step
+            const shippingStep = document.getElementById('shippingSelection');
+            const cartStep = document.getElementById('cartOptions');
+            if (shippingStep && cartStep) {
+                cartStep.classList.remove('active');
+                shippingStep.classList.add('active');
+            }
+        });
+    }
+
+    // Shipping country selection
+    const shippingCards = document.querySelectorAll('#shippingSelection .option-card');
+    shippingCards.forEach(card => {
+        card.addEventListener('click', () => {
+            // Remove selected from all cards
+            shippingCards.forEach(c => c.classList.remove('selected'));
+
+            // Mark this card as selected
+            card.classList.add('selected');
+
+            // Store selected country
+            formState.shippingCountry = card.dataset.country;
+
+            // Enable checkout button
+            const checkoutBtn = document.getElementById('proceedToCheckout');
+            if (checkoutBtn) {
+                checkoutBtn.disabled = false;
+            }
+        });
+    });
+
+    // Back button from shipping to cart
+    const shippingBackBtn = document.getElementById('shippingBack');
+    if (shippingBackBtn) {
+        shippingBackBtn.addEventListener('click', () => {
+            const shippingStep = document.getElementById('shippingSelection');
+            const cartStep = document.getElementById('cartOptions');
+            if (shippingStep && cartStep) {
+                shippingStep.classList.remove('active');
+                cartStep.classList.add('active');
+            }
+        });
+    }
+
+    // Proceed to Checkout button (from shipping selection)
     const proceedCheckoutBtn = document.getElementById('proceedToCheckout');
     if (proceedCheckoutBtn) {
         proceedCheckoutBtn.addEventListener('click', async () => {
@@ -785,12 +839,18 @@
                 return;
             }
 
+            if (!formState.shippingCountry) {
+                alert('Please select a shipping destination');
+                return;
+            }
+
             goToStep('loading');
 
             try {
-                // Prepare checkout data with cart items
+                // Prepare checkout data with cart items and shipping country
                 const checkoutData = {
                     cartItems: cart.items,
+                    shippingCountry: formState.shippingCountry,
                     successUrl: CONFIG.successUrl,
                     cancelUrl: CONFIG.cancelUrl
                 };
