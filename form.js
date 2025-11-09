@@ -49,8 +49,25 @@
 
             // Prices for display (should match your Stripe prices)
             prices: {
-                standard: { small: 25, medium: 35, large: 45 },
-                custom: { small: 35, medium: 45, large: 55 }
+                eur: {
+                    standard: { small: 30, medium: 35, large: 45 },
+                    custom: { small: 35, medium: 45, large: 55 }
+                },
+                gbp: {
+                    standard: { small: 26, medium: 30, large: 38 },
+                    custom: { small: 30, medium: 38, large: 47 }
+                },
+                usd: {
+                    standard: { small: 33, medium: 38, large: 50 },
+                    custom: { small: 38, medium: 50, large: 60 }
+                }
+            },
+
+            // Currency symbols
+            currencySymbols: {
+                eur: '€',
+                gbp: '£',
+                usd: '$'
             }
         };
     
@@ -66,8 +83,55 @@
         townlandDisplay: null, // For showing to customer
         size: null, // 'small', 'medium', 'large'
         color: null, // 'blue', 'green', 'red'
-        shippingCountry: null // 'IE', 'GB', 'EU', 'US', 'CA'
+        shippingCountry: null, // 'IE', 'GB', 'EU', 'US', 'CA'
+        currency: 'eur' // 'eur', 'gbp', 'usd' - defaults to EUR
     };
+
+    /**
+     * Get currency based on shipping country/region
+     */
+    function getCurrencyForCountry(countryCode) {
+        if (!countryCode) return 'eur';
+        const code = countryCode.toUpperCase();
+        if (code === 'IE' || code === 'EU') return 'eur';
+        if (code === 'GB') return 'gbp';
+        if (code === 'US' || code === 'CA') return 'usd';
+        return 'eur';
+    }
+
+    /**
+     * Format price with currency symbol
+     */
+    function formatPrice(amount, currency = 'eur') {
+        const symbol = CONFIG.currencySymbols[currency] || '€';
+        return `${symbol}${amount}`;
+    }
+
+    /**
+     * Update all price displays on the page to match current currency
+     */
+    function updatePriceDisplays() {
+        const currency = formState.currency;
+
+        // Update option cards on step 1
+        const standardCard = document.querySelector('[data-product="standard"] .price');
+        const customCard = document.querySelector('[data-product="custom"] .price');
+        if (standardCard) {
+            standardCard.textContent = `From ${formatPrice(CONFIG.prices[currency].standard.small, currency)} + postage`;
+        }
+        if (customCard) {
+            customCard.textContent = `From ${formatPrice(CONFIG.prices[currency].custom.small, currency)} + postage`;
+        }
+
+        // Update price display on step 3 if size is selected
+        if (formState.size && formState.productType) {
+            const priceDisplay = document.querySelector('#priceDisplay .amount');
+            if (priceDisplay) {
+                const price = CONFIG.prices[currency][formState.productType][formState.size];
+                priceDisplay.textContent = formatPrice(price, currency);
+            }
+        }
+    }
 
     // Cart state for multi-poster checkout
     const cart = {
@@ -94,18 +158,21 @@
         },
 
         getTotalPrice() {
+            const currency = formState.currency;
             return this.items.reduce((total, item) => {
-                const price = CONFIG.prices[item.productType][item.size];
+                const price = CONFIG.prices[currency][item.productType][item.size];
                 return total + price;
             }, 0);
         },
 
         updateUI() {
+            const currency = formState.currency;
+
             // Update cart items display
             const cartItems = document.getElementById('cartItems');
             if (cartItems) {
                 cartItems.innerHTML = this.items.map((item, index) => {
-                    const price = CONFIG.prices[item.productType][item.size];
+                    const price = CONFIG.prices[currency][item.productType][item.size];
                     const sizeLabel = {small: 'A3', medium: 'A2', large: 'A1'}[item.size];
                     const typeLabel = item.productType === 'custom' ? 'Custom' : 'Standard';
                     const location = item.townlandDisplay ? ` - ${item.townlandDisplay}` : '';
@@ -116,7 +183,7 @@
                                 <strong>${typeLabel} ${sizeLabel}</strong>
                                 <div class="cart-item-meta">${item.color}${location}</div>
                             </div>
-                            <div class="cart-item-price">€${price}</div>
+                            <div class="cart-item-price">${formatPrice(price, currency)}</div>
                             <button type="button" class="cart-item-remove" data-index="${index}">✕</button>
                         </div>
                     `;
@@ -134,7 +201,7 @@
             // Update cart total
             const cartTotal = document.getElementById('cartTotal');
             if (cartTotal) {
-                cartTotal.textContent = `€${this.getTotalPrice()}`;
+                cartTotal.textContent = formatPrice(this.getTotalPrice(), currency);
             }
         }
     };
@@ -706,8 +773,9 @@
     
     function updatePriceDisplay() {
         if (formState.productType && formState.size) {
-            const price = CONFIG.prices[formState.productType][formState.size];
-            document.querySelector('#priceDisplay .amount').textContent = `€${price}`;
+            const currency = formState.currency;
+            const price = CONFIG.prices[currency][formState.productType][formState.size];
+            document.querySelector('#priceDisplay .amount').textContent = formatPrice(price, currency);
         }
     }
     
@@ -808,6 +876,15 @@
 
             // Store selected country
             formState.shippingCountry = card.dataset.country;
+
+            // Update currency based on shipping country
+            formState.currency = getCurrencyForCountry(formState.shippingCountry);
+
+            // Update all price displays to match new currency
+            updatePriceDisplays();
+            cart.updateUI();
+
+            console.log(`Currency changed to ${formState.currency.toUpperCase()} for ${formState.shippingCountry}`);
 
             // Enable checkout button
             const checkoutBtn = document.getElementById('proceedToCheckout');
