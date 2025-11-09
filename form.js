@@ -27,7 +27,7 @@
     // Main initialization function
     function init() {
         console.log('Poster form initializing...');
-        
+
         // Check if our HTML elements exist
         const container = document.querySelector('.poster-form-container');
         if (!container) {
@@ -35,8 +35,13 @@
             setTimeout(init, 100);
             return;
         }
-        
+
         console.log('Form container found!');
+
+        // Check if user came back from Stripe checkout
+        const urlHash = window.location.hash;
+        const returningFromCheckout = urlHash === '#cancel';
+        const checkoutSuccessful = urlHash === '#success';
         
         // ============================================
         // CONFIGURATION - UPDATE THESE VALUES
@@ -44,8 +49,8 @@
         
         const CONFIG = {
             workerUrl: 'https://poster-checkout.jack-7a4.workers.dev',
-            successUrl: window.location.origin + '/#success', // Change to your success page
-            cancelUrl: window.location.origin, // Change to your cancel/home page
+            successUrl: window.location.origin + '/#success',
+            cancelUrl: window.location.origin + '/#cancel',
 
             // Prices for display (should match your Stripe prices)
             prices: {
@@ -968,6 +973,13 @@
                 throw new Error('No checkout URL received');
             }
             
+                // Save cart to localStorage before redirecting
+                localStorage.setItem('posterCart', JSON.stringify({
+                    items: cart.items,
+                    shippingCountry: formState.shippingCountry,
+                    currency: formState.currency
+                }));
+
                 // Redirect to Stripe Checkout
                 console.log('Redirecting to:', data.url);
                 window.location.href = data.url;
@@ -1002,7 +1014,68 @@
     
     // Initialize: Set eircode as default location type
     formState.locationType = 'eircode';
-    
+
+    // Restore cart if user came back from cancelled checkout
+    if (returningFromCheckout) {
+        console.log('User returned from cancelled checkout - restoring cart...');
+
+        // Try to restore cart from localStorage
+        const savedCart = localStorage.getItem('posterCart');
+        if (savedCart) {
+            try {
+                const cartData = JSON.parse(savedCart);
+
+                // Restore cart items
+                cart.items = cartData.items || [];
+
+                // Restore shipping country and currency
+                if (cartData.shippingCountry) {
+                    formState.shippingCountry = cartData.shippingCountry;
+                    formState.currency = cartData.currency || getCurrencyForCountry(cartData.shippingCountry);
+                }
+
+                // Update cart UI with restored items
+                cart.updateUI();
+                updatePriceDisplays();
+
+                // Show shipping selection step
+                document.querySelectorAll('.form-step').forEach(s => s.classList.remove('active'));
+                const shippingStep = document.getElementById('shippingSelection');
+                if (shippingStep) {
+                    shippingStep.classList.add('active');
+
+                    // Pre-select the shipping country if available
+                    if (formState.shippingCountry) {
+                        const selectedCard = document.querySelector(`#shippingSelection .option-card[data-country="${formState.shippingCountry}"]`);
+                        if (selectedCard) {
+                            selectedCard.classList.add('selected');
+                            const checkoutBtn = document.getElementById('proceedToCheckout');
+                            if (checkoutBtn) {
+                                checkoutBtn.disabled = false;
+                            }
+                        }
+                    }
+                }
+
+                console.log('Cart restored successfully');
+
+                // Clear the hash
+                history.replaceState(null, null, ' ');
+
+            } catch (e) {
+                console.error('Error restoring cart:', e);
+                localStorage.removeItem('posterCart');
+            }
+        }
+    }
+
+    // Clear cart if checkout was successful
+    if (checkoutSuccessful) {
+        console.log('Checkout successful - clearing cart');
+        localStorage.removeItem('posterCart');
+        cart.clear();
+    }
+
     console.log('Poster form initialized successfully');
     } // end init function
     
