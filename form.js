@@ -1059,8 +1059,8 @@
 
                 console.log('Cart restored successfully');
 
-                // Clear the hash
-                history.replaceState(null, null, ' ');
+                // Navigate to the form section and clear the cancel hash
+                history.replaceState(null, null, '#buy-poster');
 
             } catch (e) {
                 console.error('Error restoring cart:', e);
