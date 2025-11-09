@@ -974,11 +974,14 @@
             }
             
                 // Save cart to localStorage before redirecting
+                console.log('ABOUT TO SAVE CART:', cart.items.length, 'items');
+                debugger; // TEMPORARY - Pause here to debug
                 localStorage.setItem('posterCart', JSON.stringify({
                     items: cart.items,
                     shippingCountry: formState.shippingCountry,
                     currency: formState.currency
                 }));
+                console.log('CART SAVED TO LOCALSTORAGE');
 
                 // Redirect to Stripe Checkout
                 console.log('Redirecting to:', data.url);
