@@ -40,8 +40,12 @@
 
         // Check if user came back from Stripe checkout
         const urlHash = window.location.hash;
-        const returningFromCheckout = urlHash === '#cancel';
         const checkoutSuccessful = urlHash === '#success';
+
+        // Check if we should restore cart (at #buy-poster with saved cart data)
+        const savedCart = localStorage.getItem('posterCart');
+        const atFormSection = urlHash === '#buy-poster';
+        const returningFromCheckout = atFormSection && savedCart !== null;
         
         // ============================================
         // CONFIGURATION - UPDATE THESE VALUES
@@ -50,7 +54,7 @@
         const CONFIG = {
             workerUrl: 'https://poster-checkout.jack-7a4.workers.dev',
             successUrl: window.location.origin + '/#success',
-            cancelUrl: window.location.origin + '/#cancel',
+            cancelUrl: window.location.origin + '/#buy-poster',
 
             // Prices for display (should match your Stripe prices)
             prices: {
@@ -974,14 +978,11 @@
             }
             
                 // Save cart to localStorage before redirecting
-                console.log('ABOUT TO SAVE CART:', cart.items.length, 'items');
-                debugger; // TEMPORARY - Pause here to debug
                 localStorage.setItem('posterCart', JSON.stringify({
                     items: cart.items,
                     shippingCountry: formState.shippingCountry,
                     currency: formState.currency
                 }));
-                console.log('CART SAVED TO LOCALSTORAGE');
 
                 // Redirect to Stripe Checkout
                 console.log('Redirecting to:', data.url);
@@ -1022,53 +1023,49 @@
     if (returningFromCheckout) {
         console.log('User returned from cancelled checkout - restoring cart...');
 
-        // Try to restore cart from localStorage
-        const savedCart = localStorage.getItem('posterCart');
-        if (savedCart) {
-            try {
-                const cartData = JSON.parse(savedCart);
+        try {
+            const cartData = JSON.parse(savedCart);
 
-                // Restore cart items
-                cart.items = cartData.items || [];
+            // Restore cart items
+            cart.items = cartData.items || [];
 
-                // Restore shipping country and currency
-                if (cartData.shippingCountry) {
-                    formState.shippingCountry = cartData.shippingCountry;
-                    formState.currency = cartData.currency || getCurrencyForCountry(cartData.shippingCountry);
-                }
+            // Restore shipping country and currency
+            if (cartData.shippingCountry) {
+                formState.shippingCountry = cartData.shippingCountry;
+                formState.currency = cartData.currency || getCurrencyForCountry(cartData.shippingCountry);
+            }
 
-                // Update cart UI with restored items
-                cart.updateUI();
-                updatePriceDisplays();
+            // Update cart UI with restored items
+            cart.updateUI();
+            updatePriceDisplays();
 
-                // Show shipping selection step
-                document.querySelectorAll('.form-step').forEach(s => s.classList.remove('active'));
-                const shippingStep = document.getElementById('shippingSelection');
-                if (shippingStep) {
-                    shippingStep.classList.add('active');
+            // Show shipping selection step
+            document.querySelectorAll('.form-step').forEach(s => s.classList.remove('active'));
+            const shippingStep = document.getElementById('shippingSelection');
+            if (shippingStep) {
+                shippingStep.classList.add('active');
 
-                    // Pre-select the shipping country if available
-                    if (formState.shippingCountry) {
-                        const selectedCard = document.querySelector(`#shippingSelection .option-card[data-country="${formState.shippingCountry}"]`);
-                        if (selectedCard) {
-                            selectedCard.classList.add('selected');
-                            const checkoutBtn = document.getElementById('proceedToCheckout');
-                            if (checkoutBtn) {
-                                checkoutBtn.disabled = false;
-                            }
+                // Pre-select the shipping country if available
+                if (formState.shippingCountry) {
+                    const selectedCard = document.querySelector(`#shippingSelection .option-card[data-country="${formState.shippingCountry}"]`);
+                    if (selectedCard) {
+                        selectedCard.classList.add('selected');
+                        const checkoutBtn = document.getElementById('proceedToCheckout');
+                        if (checkoutBtn) {
+                            checkoutBtn.disabled = false;
                         }
                     }
                 }
-
-                console.log('Cart restored successfully');
-
-                // Navigate to the form section and clear the cancel hash
-                history.replaceState(null, null, '#buy-poster');
-
-            } catch (e) {
-                console.error('Error restoring cart:', e);
-                localStorage.removeItem('posterCart');
             }
+
+            console.log('Cart restored successfully');
+
+            // Clear the saved cart from localStorage after restoration
+            localStorage.removeItem('posterCart');
+
+        } catch (e) {
+            console.error('Error restoring cart:', e);
+            localStorage.removeItem('posterCart');
         }
     }
 
