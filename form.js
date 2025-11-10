@@ -639,18 +639,22 @@
     // Address autocomplete
     let selectedIndex = -1;
     let currentResults = [];
-    
+    let searchTimeout = null;  // For debouncing search
+
     document.getElementById('addressInput').addEventListener('input', function(e) {
         const query = e.target.value.trim();
         const resultsDiv = document.getElementById('autocompleteResults');
-        
+
+        // Clear any existing timeout
+        clearTimeout(searchTimeout);
+
         // Check if locations are loaded
         if (!locationsLoaded || !fuse) {
             resultsDiv.innerHTML = '<div class="autocomplete-item">Loading locations...</div>';
             resultsDiv.classList.add('active');
             return;
         }
-        
+
         if (query.length < 2) {
             resultsDiv.classList.remove('active');
             formState.locationValue = null;
@@ -659,52 +663,55 @@
             return;
         }
 
-        // Search locations (now searches by name, Irish name, and display)
-        const searchResults = fuse.search(query);
-        currentResults = searchResults.slice(0, 100);  // Increased from 10 to handle duplicate names (e.g., 244 "Glebe"s)
+        // Debounce search - wait 200ms after user stops typing
+        searchTimeout = setTimeout(() => {
+            // Search locations (now searches by name, Irish name, and display)
+            const searchResults = fuse.search(query);
+            currentResults = searchResults.slice(0, 100);  // Increased from 10 to handle duplicate names (e.g., 244 "Glebe"s)
 
-        if (currentResults.length === 0) {
-            resultsDiv.innerHTML = '<div class="autocomplete-item">No locations found</div>';
+            if (currentResults.length === 0) {
+                resultsDiv.innerHTML = '<div class="autocomplete-item">No locations found</div>';
+                resultsDiv.classList.add('active');
+                formState.locationValue = null;
+                formState.townlandDisplay = null;
+                updateStep2Button();
+                return;
+            }
+
+            // Display results using 'display' property and Irish name if available
+            const html = currentResults.map((result, index) => {
+                const location = result.item;
+                const parts = location.display.split(',');
+                const locationName = parts[0].trim();
+                const details = parts.slice(1).join(',').trim();
+                const irishName = location.name_ga;
+
+                // Show Irish name in smaller font if available
+                const irishNameHtml = irishName ? `<div class="location-irish">${irishName}</div>` : '';
+
+                return `
+                    <div class="autocomplete-item" data-index="${index}">
+                        <strong>${locationName}</strong>
+                        ${irishNameHtml}
+                        <div class="location-detail">${details}</div>
+                    </div>
+                `;
+            }).join('');
+
+            resultsDiv.innerHTML = html;
             resultsDiv.classList.add('active');
-            formState.locationValue = null;
-            formState.townlandDisplay = null;
-            updateStep2Button();
-            return;
-        }
-
-        // Display results using 'display' property and Irish name if available
-        const html = currentResults.map((result, index) => {
-            const location = result.item;
-            const parts = location.display.split(',');
-            const locationName = parts[0].trim();
-            const details = parts.slice(1).join(',').trim();
-            const irishName = location.name_ga;
-
-            // Show Irish name in smaller font if available
-            const irishNameHtml = irishName ? `<div class="location-irish">${irishName}</div>` : '';
-
-            return `
-                <div class="autocomplete-item" data-index="${index}">
-                    <strong>${locationName}</strong>
-                    ${irishNameHtml}
-                    <div class="location-detail">${details}</div>
-                </div>
-            `;
-        }).join('');
+            selectedIndex = -1;
         
-        resultsDiv.innerHTML = html;
-        resultsDiv.classList.add('active');
-        selectedIndex = -1;
-        
-        // Add click handlers
-        document.querySelectorAll('.autocomplete-item').forEach(item => {
-            item.addEventListener('click', function() {
-                const index = parseInt(this.dataset.index);
-                if (!isNaN(index)) {
-                    selectLocation(currentResults[index].item); // Pass full object
-                }
+            // Add click handlers
+            document.querySelectorAll('.autocomplete-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    if (!isNaN(index)) {
+                        selectLocation(currentResults[index].item); // Pass full object
+                    }
+                });
             });
-        });
+        }, 200);  // 200ms debounce delay
     });
 
     function selectLocation(location) {
