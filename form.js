@@ -220,7 +220,7 @@
     // ============================================
     
     // UPDATE THIS URL to point to your hosted locations.json file
-    const LOCATIONS_JSON_URL = 'https://pub-ddc543ba1c324125b2264e2dc4f23293.r2.dev/townland_locations_with_ids.json?v=3';
+    const LOCATIONS_JSON_URL = 'https://pub-ddc543ba1c324125b2264e2dc4f23293.r2.dev/townland_locations_with_ids_irish.json?v=1';
 
     let locations = [];
     let fuse = null;
@@ -239,10 +239,10 @@
             // NEW: Locations are now objects with id, name, display, etc.
             // Example: { id: "level10_stoops_a1b2", name: "Stoops", display: "Stoops, Shillelagh, Co. Wicklow" }
 
-            // Initialize Fuse.js for fuzzy search (search by name)
+            // Initialize Fuse.js for fuzzy search (search by name, Irish name, and full display)
             fuse = new Fuse(locations, {
                 threshold: 0.3,
-                keys: ['name'] // Search by townland name
+                keys: ['name', 'name_ga', 'display'] // Search by English name, Irish name, and full display
             });
 
             locationsLoaded = true;
@@ -659,9 +659,9 @@
             return;
         }
 
-        // Search locations (now searches by 'name' key in object)
+        // Search locations (now searches by name, Irish name, and display)
         const searchResults = fuse.search(query);
-        currentResults = searchResults.slice(0, 10);
+        currentResults = searchResults.slice(0, 100);  // Increased from 10 to handle duplicate names (e.g., 244 "Glebe"s)
 
         if (currentResults.length === 0) {
             resultsDiv.innerHTML = '<div class="autocomplete-item">No locations found</div>';
@@ -672,16 +672,21 @@
             return;
         }
 
-        // Display results using 'display' property
+        // Display results using 'display' property and Irish name if available
         const html = currentResults.map((result, index) => {
             const location = result.item;
             const parts = location.display.split(',');
             const locationName = parts[0].trim();
             const details = parts.slice(1).join(',').trim();
+            const irishName = location.name_ga;
+
+            // Show Irish name in smaller font if available
+            const irishNameHtml = irishName ? `<div class="location-irish">${irishName}</div>` : '';
 
             return `
                 <div class="autocomplete-item" data-index="${index}">
                     <strong>${locationName}</strong>
+                    ${irishNameHtml}
                     <div class="location-detail">${details}</div>
                 </div>
             `;
