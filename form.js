@@ -1360,11 +1360,16 @@
         const size = urlParams.get('size');
         const color = urlParams.get('color');
 
-        // Find the townland in the data to get the display name
-        fetch(townlandsDataUrl)
-            .then(response => response.json())
-            .then(townlandsData => {
-                const townland = townlandsData.find(t => t.id === townlandId);
+        // Wait for locations to load, then auto-populate
+        async function autoPopulateCart() {
+            try {
+                // Ensure locations are loaded
+                if (!locationsLoaded) {
+                    await loadLocations();
+                }
+
+                // Find the townland in the data
+                const townland = locations.find(t => t.id === townlandId);
 
                 if (townland) {
                     console.log('Found townland:', townland.display);
@@ -1388,10 +1393,12 @@
                 } else {
                     console.warn('Townland not found:', townlandId);
                 }
-            })
-            .catch(error => {
-                console.error('Failed to load townland data for auto-populate:', error);
-            });
+            } catch (error) {
+                console.error('Failed to auto-populate cart:', error);
+            }
+        }
+
+        autoPopulateCart();
     }
 
     console.log('Poster form initialized successfully');
