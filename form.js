@@ -1092,6 +1092,47 @@
     // PREVIEW REQUEST FUNCTIONALITY
     // ============================================================================
 
+    // Create modal HTML dynamically if it doesn't exist
+    if (!document.getElementById('previewModal')) {
+        const modalHTML = `
+<!-- Preview Request Modal -->
+<div id="previewModal" class="modal" style="display: none;">
+<div class="modal-content">
+<span class="modal-close">&times;</span>
+<h2>Get a Preview</h2>
+<p>Enter your email to receive a preview of your poster before purchasing.</p>
+
+<form id="previewForm">
+<div class="form-group">
+<label for="previewEmail">Email Address *</label>
+<input type="email" id="previewEmail" required placeholder="you@example.com">
+</div>
+
+<div class="form-group">
+<label class="checkbox-label">
+<input type="checkbox" id="previewOptIn">
+<span>Keep me updated about new products and features</span>
+</label>
+</div>
+
+<div class="form-group">
+<p class="preview-note">You'll receive a lower-resolution preview via email. The final poster will be printed at full resolution on premium paper.</p>
+</div>
+
+<div id="previewError" class="error-message" style="display: none;"></div>
+<div id="previewSuccess" class="success-message" style="display: none;"></div>
+
+<div class="modal-actions">
+<button type="button" class="btn-secondary" id="cancelPreview">Cancel</button>
+<button type="submit" class="btn-primary" id="submitPreview">Send Preview</button>
+</div>
+</form>
+</div>
+</div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    }
+
     const previewModal = document.getElementById('previewModal');
     const previewBtn = document.getElementById('getPreviewBtn');
     const previewForm = document.getElementById('previewForm');
