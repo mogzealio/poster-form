@@ -539,10 +539,28 @@
                 }
                 updateColorPreview('green');
             }
-            
+
             // Update price display and button state
             updatePriceDisplay();
             updateStep3Button();
+
+            // Show preview button for custom posters
+            const toggleBtn = document.getElementById('togglePreviewBtn');
+            if (toggleBtn) {
+                toggleBtn.style.display = formState.productType === 'custom' ? 'inline-block' : 'none';
+            }
+        } else {
+            // Hide preview button when not on step 3
+            const toggleBtn = document.getElementById('togglePreviewBtn');
+            if (toggleBtn) {
+                toggleBtn.style.display = 'none';
+            }
+
+            // Hide preview section when leaving step 3
+            const prevSection = document.getElementById('previewSection');
+            if (prevSection) {
+                prevSection.style.display = 'none';
+            }
         }
         
         // Scroll to the form container (not page top)
@@ -1092,108 +1110,93 @@
     // PREVIEW REQUEST FUNCTIONALITY
     // ============================================================================
 
-    // Create modal HTML dynamically if it doesn't exist
-    if (!document.getElementById('previewModal')) {
-        const modalHTML = `
-<!-- Preview Request Modal -->
-<div id="previewModal" class="modal" style="display: none;">
-<div class="modal-content">
-<span class="modal-close">&times;</span>
-<h2>Get a Preview</h2>
-<p>Enter your email to receive a preview of your poster before purchasing.</p>
+    const previewSection = document.getElementById('previewSection');
 
+    // Create inline preview form HTML
+    if (previewSection && !document.getElementById('previewForm')) {
+        const previewHTML = `
+<div style="margin: 20px 0; padding: 20px; background: rgba(90, 111, 100, 0.1); border: 1px solid #5a6f64; border-radius: 8px;">
+<h3 style="margin: 0 0 10px 0; font-size: 16px; color: #DEDED3;">Get a Preview First</h3>
+<p style="margin: 0 0 15px 0; font-size: 14px; color: #B8B8A8;">Enter your email to receive a preview before purchasing.</p>
 <form id="previewForm">
 <div class="form-group">
-<label for="previewEmail">Email Address *</label>
-<input type="email" id="previewEmail" required placeholder="you@example.com">
+<label for="previewEmail" style="display: block; margin-bottom: 5px; font-size: 14px; color: #DEDED3;">Email Address *</label>
+<input type="email" id="previewEmail" required placeholder="you@example.com" style="width: 100%; padding: 10px; background: #2a3a32; border: 1px solid #5a6f64; border-radius: 4px; color: #DEDED3; font-size: 14px;">
 </div>
-
-<div class="form-group">
-<label class="checkbox-label">
-<input type="checkbox" id="previewOptIn">
+<div class="form-group" style="margin: 15px 0;">
+<label class="checkbox-label" style="display: flex; align-items: center; font-size: 14px; color: #B8B8A8; cursor: pointer;">
+<input type="checkbox" id="previewOptIn" style="margin-right: 8px;">
 <span>Keep me updated about new products and features</span>
 </label>
 </div>
-
-<div class="form-group">
-<p class="preview-note">You'll receive a lower-resolution preview via email. The final poster will be printed at full resolution on premium paper.</p>
+<div id="previewError" class="error-message" style="display: none; margin: 10px 0;"></div>
+<div id="previewSuccess" class="success-message" style="display: none; margin: 10px 0; color: #7fb069;"></div>
+<div style="display: flex; gap: 10px; margin-top: 15px;">
+<button type="button" id="cancelPreview" class="btn-secondary" style="flex: 1;">Cancel</button>
+<button type="submit" id="submitPreview" class="btn-primary" style="flex: 2;">Send Preview</button>
 </div>
-
-<div id="previewError" class="error-message" style="display: none;"></div>
-<div id="previewSuccess" class="success-message" style="display: none;"></div>
-
-<div class="modal-actions">
-<button type="button" class="btn-secondary" id="cancelPreview">Cancel</button>
-<button type="submit" class="btn-primary" id="submitPreview">Send Preview</button>
-</div>
+<p style="margin: 15px 0 0 0; font-size: 12px; color: #8a9a8f; font-style: italic;">You'll receive a lower-resolution preview via email. The final poster will be printed at full resolution.</p>
 </form>
 </div>
-</div>
         `;
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        previewSection.innerHTML = previewHTML;
     }
 
-    const previewModal = document.getElementById('previewModal');
-    const previewBtn = document.getElementById('getPreviewBtn');
+    // Show preview option only for custom posters
+    function updatePreviewVisibility() {
+        if (!previewSection) return;
+
+        // Only show for custom product type
+        const showPreview = formState.productType === 'custom';
+        previewSection.style.display = showPreview ? 'block' : 'none';
+    }
+
+    // Create "Get a preview" button dynamically in step 3
+    const step3ButtonGroup = document.querySelector('[data-step="3"] .button-group');
+    if (step3ButtonGroup && !document.getElementById('togglePreviewBtn')) {
+        const previewToggleBtn = document.createElement('button');
+        previewToggleBtn.type = 'button';
+        previewToggleBtn.id = 'togglePreviewBtn';
+        previewToggleBtn.className = 'btn-secondary';
+        previewToggleBtn.textContent = '✉ Get a Preview';
+        previewToggleBtn.style.display = 'none'; // Hidden by default
+
+        // Insert between Back and Add to Cart
+        const step3Back = document.getElementById('step3Back');
+        step3Back.parentNode.insertBefore(previewToggleBtn, step3Back.nextSibling);
+    }
+
+    const togglePreviewBtn = document.getElementById('togglePreviewBtn');
     const previewForm = document.getElementById('previewForm');
     const previewEmailInput = document.getElementById('previewEmail');
     const previewOptIn = document.getElementById('previewOptIn');
     const previewError = document.getElementById('previewError');
     const previewSuccess = document.getElementById('previewSuccess');
-    const modalClose = document.querySelector('.modal-close');
     const cancelPreviewBtn = document.getElementById('cancelPreview');
 
-    // Function to update preview button visibility
-    function updatePreviewButtonVisibility() {
-        if (!previewBtn) return;
+    // Toggle preview section visibility
+    if (togglePreviewBtn && previewSection) {
+        togglePreviewBtn.addEventListener('click', () => {
+            const isVisible = previewSection.style.display === 'block';
+            previewSection.style.display = isVisible ? 'none' : 'block';
+            togglePreviewBtn.textContent = isVisible ? '✉ Get a Preview' : '✕ Hide Preview';
 
-        // Only show preview button if cart has exactly 1 custom poster
-        const hasOneCustomItem = cart.items.length === 1 &&
-                                 cart.items[0].productType === 'custom';
-
-        previewBtn.style.display = hasOneCustomItem ? 'inline-block' : 'none';
-    }
-
-    // Override cart updateUI to also update preview button
-    const originalUpdateUI = cart.updateUI.bind(cart);
-    cart.updateUI = function() {
-        originalUpdateUI();
-        updatePreviewButtonVisibility();
-    };
-
-    // Open preview modal
-    if (previewBtn) {
-        previewBtn.addEventListener('click', () => {
-            if (previewModal) {
-                previewModal.style.display = 'block';
-                previewError.style.display = 'none';
-                previewSuccess.style.display = 'none';
-                previewForm.reset();
+            if (!isVisible) {
+                // Reset form when opening
+                if (previewForm) previewForm.reset();
+                if (previewError) previewError.style.display = 'none';
+                if (previewSuccess) previewSuccess.style.display = 'none';
             }
         });
     }
 
-    // Close modal handlers
-    function closeModal() {
-        if (previewModal) {
-            previewModal.style.display = 'none';
-        }
+    // Cancel button hides the preview section
+    if (cancelPreviewBtn && previewSection && togglePreviewBtn) {
+        cancelPreviewBtn.addEventListener('click', () => {
+            previewSection.style.display = 'none';
+            togglePreviewBtn.textContent = '✉ Get a Preview';
+        });
     }
-
-    if (modalClose) {
-        modalClose.addEventListener('click', closeModal);
-    }
-
-    if (cancelPreviewBtn) {
-        cancelPreviewBtn.addEventListener('click', closeModal);
-    }
-
-    // Close modal when clicking outside
-    window.addEventListener('click', (e) => {
-        if (e.target === previewModal) {
-            closeModal();
-        }
-    });
 
     // Handle preview form submission
     if (previewForm) {
@@ -1204,21 +1207,22 @@
             const originalText = submitBtn.textContent;
 
             try {
-                // Validate cart has exactly one item
-                if (cart.items.length !== 1) {
-                    throw new Error('Preview is only available for single items');
-                }
-
-                const item = cart.items[0];
-
-                // Validate it's a custom poster
-                if (item.productType !== 'custom') {
+                // Validate we're on custom product type
+                if (formState.productType !== 'custom') {
                     throw new Error('Preview is only available for custom posters');
                 }
 
-                // Validate required fields
-                if (!item.townlandId || !item.townlandDisplay) {
-                    throw new Error('Missing townland information');
+                // Validate required fields from formState
+                if (!formState.locationValue || !formState.townlandDisplay) {
+                    throw new Error('Please select a townland first');
+                }
+
+                if (!formState.size) {
+                    throw new Error('Please select a size first');
+                }
+
+                if (!formState.color) {
+                    throw new Error('Please select a color scheme first');
                 }
 
                 // Hide errors, show loading
@@ -1227,12 +1231,12 @@
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Sending...';
 
-                // Build preview request
+                // Build preview request using formState
                 const previewRequest = {
-                    townland_id: item.townlandId,
-                    townland_display: item.townlandDisplay,
-                    size: item.size,
-                    color: item.color,
+                    townland_id: formState.locationValue,
+                    townland_display: formState.townlandDisplay,
+                    size: formState.size,
+                    color: formState.color === 'default' ? 'green' : formState.color,
                     customer_email: previewEmailInput.value.trim(),
                     opt_in_marketing: previewOptIn.checked
                 };
@@ -1258,11 +1262,15 @@
                 previewSuccess.textContent = result.message || 'Preview request sent! Check your email shortly.';
                 previewSuccess.style.display = 'block';
 
-                // Reset form and close modal after delay
+                // Reset form after delay
                 setTimeout(() => {
-                    closeModal();
+                    if (previewSection && togglePreviewBtn) {
+                        previewSection.style.display = 'none';
+                        togglePreviewBtn.textContent = '✉ Get a Preview';
+                    }
                     previewForm.reset();
-                }, 2000);
+                    previewSuccess.style.display = 'none';
+                }, 3000);
 
             } catch (error) {
                 console.error('Preview request error:', error);
@@ -1274,9 +1282,6 @@
             }
         });
     }
-
-    // Initial preview button visibility check
-    updatePreviewButtonVisibility();
 
     console.log('Poster form initialized successfully');
     } // end init function
