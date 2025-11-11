@@ -1135,7 +1135,7 @@
 <button type="button" id="cancelPreview" class="btn-secondary" style="flex: 1;">Cancel</button>
 <button type="submit" id="submitPreview" class="btn-primary" style="flex: 2;">Send Preview</button>
 </div>
-<p style="margin: 15px 0 0 0; font-size: 12px; color: #8a9a8f; font-style: italic;">You'll receive a lower-resolution preview via email. The final poster will be printed at full resolution.</p>
+<p style="margin: 15px 0 0 0; font-size: 12px; color: #8a9a8f; font-style: italic;">You'll receive a lower-resolution preview via email. The final poster will be printed at 300dpi on high quality matte art paper.</p>
 </form>
 </div>
         `;
@@ -1151,6 +1151,45 @@
         previewSection.style.display = showPreview ? 'block' : 'none';
     }
 
+    // Rate limiting helpers (client-side)
+    const PREVIEW_COOLDOWN_HOURS = 24;
+
+    function checkPreviewCooldown(email) {
+        try {
+            const key = `preview_request_${email.toLowerCase()}`;
+            const timestamp = localStorage.getItem(key);
+
+            if (!timestamp) return { allowed: true };
+
+            const requestTime = parseInt(timestamp);
+            const now = Date.now();
+            const hoursAgo = (now - requestTime) / (1000 * 60 * 60);
+
+            if (hoursAgo < PREVIEW_COOLDOWN_HOURS) {
+                const hoursRemaining = Math.ceil(PREVIEW_COOLDOWN_HOURS - hoursAgo);
+                return {
+                    allowed: false,
+                    message: `Preview already requested. Please wait ${hoursRemaining} hour(s) before requesting another. Thanks!`
+                };
+            }
+
+            return { allowed: true };
+        } catch (e) {
+            // If localStorage fails, allow the request
+            return { allowed: true };
+        }
+    }
+
+    function recordPreviewRequest(email) {
+        try {
+            const key = `preview_request_${email.toLowerCase()}`;
+            localStorage.setItem(key, Date.now().toString());
+        } catch (e) {
+            // Ignore localStorage errors
+            console.warn('Could not save preview request to localStorage');
+        }
+    }
+
     // Create "Get a preview" button dynamically in step 3
     const step3ButtonGroup = document.querySelector('[data-step="3"] .button-group');
     if (step3ButtonGroup && !document.getElementById('togglePreviewBtn')) {
@@ -1158,7 +1197,7 @@
         previewToggleBtn.type = 'button';
         previewToggleBtn.id = 'togglePreviewBtn';
         previewToggleBtn.className = 'btn-secondary';
-        previewToggleBtn.textContent = '✉ Get a Preview';
+        previewToggleBtn.textContent = 'Get a Preview';
         previewToggleBtn.style.display = 'none'; // Hidden by default
 
         // Insert between Back and Add to Cart
@@ -1179,7 +1218,7 @@
         togglePreviewBtn.addEventListener('click', () => {
             const isVisible = previewSection.style.display === 'block';
             previewSection.style.display = isVisible ? 'none' : 'block';
-            togglePreviewBtn.textContent = isVisible ? '✉ Get a Preview' : '✕ Hide Preview';
+            togglePreviewBtn.textContent = isVisible ? 'Get a Preview' : 'Hide Preview';
 
             if (!isVisible) {
                 // Reset form when opening
@@ -1194,7 +1233,7 @@
     if (cancelPreviewBtn && previewSection && togglePreviewBtn) {
         cancelPreviewBtn.addEventListener('click', () => {
             previewSection.style.display = 'none';
-            togglePreviewBtn.textContent = '✉ Get a Preview';
+            togglePreviewBtn.textContent = 'Get a Preview';
         });
     }
 
@@ -1225,6 +1264,17 @@
                     throw new Error('Please select a color scheme first');
                 }
 
+                const customerEmail = previewEmailInput.value.trim();
+                if (!customerEmail) {
+                    throw new Error('Please enter your email address');
+                }
+
+                // Check client-side rate limiting
+                const cooldownCheck = checkPreviewCooldown(customerEmail);
+                if (!cooldownCheck.allowed) {
+                    throw new Error(cooldownCheck.message);
+                }
+
                 // Hide errors, show loading
                 previewError.style.display = 'none';
                 previewSuccess.style.display = 'none';
@@ -1237,7 +1287,7 @@
                     townland_display: formState.townlandDisplay,
                     size: formState.size,
                     color: formState.color === 'default' ? 'green' : formState.color,
-                    customer_email: previewEmailInput.value.trim(),
+                    customer_email: customerEmail,
                     opt_in_marketing: previewOptIn.checked
                 };
 
@@ -1258,15 +1308,24 @@
                 const result = await response.json();
                 console.log('Preview request created:', result);
 
+                // Record the request in localStorage
+                recordPreviewRequest(customerEmail);
+
+                // Disable the preview button for this session
+                if (togglePreviewBtn) {
+                    togglePreviewBtn.disabled = true;
+                    togglePreviewBtn.textContent = 'Preview Requested';
+                    togglePreviewBtn.style.opacity = '0.6';
+                }
+
                 // Show success message
                 previewSuccess.textContent = result.message || 'Preview request sent! Check your email shortly.';
                 previewSuccess.style.display = 'block';
 
                 // Reset form after delay
                 setTimeout(() => {
-                    if (previewSection && togglePreviewBtn) {
+                    if (previewSection) {
                         previewSection.style.display = 'none';
-                        togglePreviewBtn.textContent = '✉ Get a Preview';
                     }
                     previewForm.reset();
                     previewSuccess.style.display = 'none';
