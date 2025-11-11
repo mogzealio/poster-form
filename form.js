@@ -1117,7 +1117,7 @@
         const previewHTML = `
 <div style="margin: 20px 0; padding: 20px; background: rgba(90, 111, 100, 0.1); border: 1px solid #5a6f64; border-radius: 8px;">
 <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #DEDED3;">Get a Preview First</h3>
-<p style="margin: 0 0 15px 0; font-size: 14px; color: #B8B8A8;">Enter your email to receive a preview before purchasing.</p>
+<p id="previewDescription" style="margin: 0 0 15px 0; font-size: 14px; color: #B8B8A8; line-height: 1.5;">Enter your email to receive a preview before purchasing.</p>
 <form id="previewForm">
 <div class="form-group">
 <label for="previewEmail" style="display: block; margin-bottom: 5px; font-size: 14px; color: #DEDED3;">Email Address *</label>
@@ -1225,6 +1225,12 @@
                 if (previewForm) previewForm.reset();
                 if (previewError) previewError.style.display = 'none';
                 if (previewSuccess) previewSuccess.style.display = 'none';
+
+                // Update description with townland info
+                const previewDesc = document.getElementById('previewDescription');
+                if (previewDesc && formState.townlandDisplay) {
+                    previewDesc.textContent = `Enter your email to receive a preview Townlands of Ireland poster customised to ${formState.townlandDisplay} before purchasing. You should receive your preview within 5 minutes.`;
+                }
             }
         });
     }
