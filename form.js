@@ -1130,7 +1130,7 @@
 <div class="form-group" style="margin: 15px 0;">
 <label class="checkbox-label" style="display: flex; align-items: center; font-size: 14px; color: #B8B8A8; cursor: pointer;">
 <input type="checkbox" id="previewOptIn" style="margin-right: 8px;">
-<span>Keep me updated about new products and features</span>
+<span>Keep me updated about new designs and ideas.</span>
 </label>
 </div>
 <div id="previewError" class="error-message" style="display: none; margin: 10px 0;"></div>
