@@ -1383,6 +1383,9 @@
                         productType: 'custom'
                     });
 
+                    // Show cart options screen
+                    showCartOptions();
+
                     // Navigate to cart section
                     window.location.hash = '#buy-poster';
 
