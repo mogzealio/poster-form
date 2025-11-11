@@ -42,6 +42,10 @@
         const urlHash = window.location.hash;
         const checkoutSuccessful = urlHash === '#success';
 
+        // Check for URL parameters from preview email (e.g., ?townland=xxx&size=xxx&color=xxx)
+        const urlParams = new URLSearchParams(window.location.search);
+        const fromPreviewEmail = urlParams.has('townland') && urlParams.has('size') && urlParams.has('color');
+
         // Check if we should restore cart (at #buy-poster with saved cart data)
         const savedCart = localStorage.getItem('posterCart');
         const atFormSection = urlHash === '#buy-poster';
@@ -1346,6 +1350,48 @@
                 submitBtn.textContent = originalText;
             }
         });
+    }
+
+    // Auto-populate from preview email URL parameters
+    if (fromPreviewEmail) {
+        console.log('Auto-populating from preview email URL parameters...');
+
+        const townlandId = urlParams.get('townland');
+        const size = urlParams.get('size');
+        const color = urlParams.get('color');
+
+        // Find the townland in the data to get the display name
+        fetch(townlandsDataUrl)
+            .then(response => response.json())
+            .then(townlandsData => {
+                const townland = townlandsData.find(t => t.id === townlandId);
+
+                if (townland) {
+                    console.log('Found townland:', townland.display);
+
+                    // Add item to cart directly
+                    cart.addItem({
+                        townlandId: townlandId,
+                        townlandDisplay: townland.display,
+                        size: size,
+                        color: color,
+                        productType: 'custom'
+                    });
+
+                    // Navigate to cart section
+                    window.location.hash = '#buy-poster';
+
+                    // Clean up URL parameters
+                    window.history.replaceState({}, document.title, window.location.pathname + '#buy-poster');
+
+                    console.log('Cart auto-populated from preview email');
+                } else {
+                    console.warn('Townland not found:', townlandId);
+                }
+            })
+            .catch(error => {
+                console.error('Failed to load townland data for auto-populate:', error);
+            });
     }
 
     console.log('Poster form initialized successfully');
