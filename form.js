@@ -1088,6 +1088,155 @@
         cart.clear();
     }
 
+    // ============================================================================
+    // PREVIEW REQUEST FUNCTIONALITY
+    // ============================================================================
+
+    const previewModal = document.getElementById('previewModal');
+    const previewBtn = document.getElementById('getPreviewBtn');
+    const previewForm = document.getElementById('previewForm');
+    const previewEmailInput = document.getElementById('previewEmail');
+    const previewOptIn = document.getElementById('previewOptIn');
+    const previewError = document.getElementById('previewError');
+    const previewSuccess = document.getElementById('previewSuccess');
+    const modalClose = document.querySelector('.modal-close');
+    const cancelPreviewBtn = document.getElementById('cancelPreview');
+
+    // Function to update preview button visibility
+    function updatePreviewButtonVisibility() {
+        if (!previewBtn) return;
+
+        // Only show preview button if cart has exactly 1 custom poster
+        const hasOneCustomItem = cart.items.length === 1 &&
+                                 cart.items[0].productType === 'custom';
+
+        previewBtn.style.display = hasOneCustomItem ? 'inline-block' : 'none';
+    }
+
+    // Override cart updateUI to also update preview button
+    const originalUpdateUI = cart.updateUI.bind(cart);
+    cart.updateUI = function() {
+        originalUpdateUI();
+        updatePreviewButtonVisibility();
+    };
+
+    // Open preview modal
+    if (previewBtn) {
+        previewBtn.addEventListener('click', () => {
+            if (previewModal) {
+                previewModal.style.display = 'block';
+                previewError.style.display = 'none';
+                previewSuccess.style.display = 'none';
+                previewForm.reset();
+            }
+        });
+    }
+
+    // Close modal handlers
+    function closeModal() {
+        if (previewModal) {
+            previewModal.style.display = 'none';
+        }
+    }
+
+    if (modalClose) {
+        modalClose.addEventListener('click', closeModal);
+    }
+
+    if (cancelPreviewBtn) {
+        cancelPreviewBtn.addEventListener('click', closeModal);
+    }
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === previewModal) {
+            closeModal();
+        }
+    });
+
+    // Handle preview form submission
+    if (previewForm) {
+        previewForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitPreview');
+            const originalText = submitBtn.textContent;
+
+            try {
+                // Validate cart has exactly one item
+                if (cart.items.length !== 1) {
+                    throw new Error('Preview is only available for single items');
+                }
+
+                const item = cart.items[0];
+
+                // Validate it's a custom poster
+                if (item.productType !== 'custom') {
+                    throw new Error('Preview is only available for custom posters');
+                }
+
+                // Validate required fields
+                if (!item.townlandId || !item.townlandDisplay) {
+                    throw new Error('Missing townland information');
+                }
+
+                // Hide errors, show loading
+                previewError.style.display = 'none';
+                previewSuccess.style.display = 'none';
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Sending...';
+
+                // Build preview request
+                const previewRequest = {
+                    townland_id: item.townlandId,
+                    townland_display: item.townlandDisplay,
+                    size: item.size,
+                    color: item.color,
+                    customer_email: previewEmailInput.value.trim(),
+                    opt_in_marketing: previewOptIn.checked
+                };
+
+                console.log('Sending preview request:', previewRequest);
+
+                // Send to worker
+                const response = await fetch(`${CONFIG.workerUrl}/create-preview-request`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(previewRequest)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to create preview request');
+                }
+
+                const result = await response.json();
+                console.log('Preview request created:', result);
+
+                // Show success message
+                previewSuccess.textContent = result.message || 'Preview request sent! Check your email shortly.';
+                previewSuccess.style.display = 'block';
+
+                // Reset form and close modal after delay
+                setTimeout(() => {
+                    closeModal();
+                    previewForm.reset();
+                }, 2000);
+
+            } catch (error) {
+                console.error('Preview request error:', error);
+                previewError.textContent = error.message;
+                previewError.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+    }
+
+    // Initial preview button visibility check
+    updatePreviewButtonVisibility();
+
     console.log('Poster form initialized successfully');
     } // end init function
     
