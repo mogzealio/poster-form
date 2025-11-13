@@ -73,6 +73,10 @@
                 usd: {
                     standard: { small: 33, medium: 38, large: 50 },
                     custom: { small: 38, medium: 50, large: 60 }
+                },
+                aud: {
+                    standard: { small: 69, medium: 88, large: 100 },
+                    custom: { small: 80, medium: 113, large: 122 }
                 }
             },
 
@@ -80,7 +84,8 @@
             currencySymbols: {
                 eur: '€',
                 gbp: '£',
-                usd: '$'
+                usd: '$',
+                aud: '$'
             }
         };
     
@@ -96,8 +101,8 @@
         townlandDisplay: null, // For showing to customer
         size: null, // 'small', 'medium', 'large'
         color: null, // 'blue', 'green', 'red'
-        shippingCountry: null, // 'IE', 'GB', 'EU', 'US', 'CA'
-        currency: 'eur' // 'eur', 'gbp', 'usd' - defaults to EUR
+        shippingCountry: null, // 'IE', 'GB', 'EU', 'US', 'CA', 'AU'
+        currency: 'eur' // 'eur', 'gbp', 'usd', 'aud' - defaults to EUR
     };
 
     /**
@@ -109,6 +114,7 @@
         if (code === 'IE' || code === 'EU') return 'eur';
         if (code === 'GB') return 'gbp';
         if (code === 'US' || code === 'CA') return 'usd';
+        if (code === 'AU') return 'aud';
         return 'eur';
     }
 
@@ -1130,7 +1136,7 @@
 <div class="form-group" style="margin: 15px 0;">
 <label class="checkbox-label" style="display: flex; align-items: center; font-size: 14px; color: #B8B8A8; cursor: pointer;">
 <input type="checkbox" id="previewOptIn" style="margin-right: 8px;">
-<span>Keep me updated about new designs and ideas.</span>
+<span>Keep me updated about new products and features</span>
 </label>
 </div>
 <div id="previewError" class="error-message" style="display: none; margin: 10px 0;"></div>
