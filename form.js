@@ -46,6 +46,13 @@
         const urlParams = new URLSearchParams(window.location.search);
         const fromPreviewEmail = urlParams.has('townland') && urlParams.has('size') && urlParams.has('color');
 
+        // Capture location parameter for physical store tracking (e.g., ?location=store1)
+        const locationParam = urlParams.get('location');
+        if (locationParam) {
+            console.log('Location parameter detected:', locationParam);
+            localStorage.setItem('referral_location', locationParam);
+        }
+
         // Check if we should restore cart (at #buy-poster with saved cart data)
         const savedCart = localStorage.getItem('posterCart');
         const atFormSection = urlHash === '#buy-poster';
@@ -980,6 +987,13 @@
                     successUrl: CONFIG.successUrl,
                     cancelUrl: CONFIG.cancelUrl
                 };
+
+                // Include location parameter if available (for physical store tracking)
+                const referralLocation = localStorage.getItem('referral_location');
+                if (referralLocation) {
+                    checkoutData.referralLocation = referralLocation;
+                    console.log('Including referral location:', referralLocation);
+                }
 
                 console.log('Sending checkout request:', checkoutData);
 
