@@ -292,10 +292,15 @@
     let locations = [];
     let fuse = null;
     let locationsLoaded = false;
-    
+    let locationsLoadingStarted = false;
+
     // Load locations from external JSON file (NEW FORMAT with IDs)
     async function loadLocations() {
+        if (locationsLoadingStarted) return; // Prevent duplicate loads
+        locationsLoadingStarted = true;
+
         try {
+            console.log('Starting to load locations data...');
             const response = await fetch(LOCATIONS_JSON_URL);
             if (!response.ok) {
                 throw new Error('Failed to load locations');
@@ -315,12 +320,31 @@
             locationsLoaded = true;
             console.log(`Loaded ${locations.length} locations with IDs`);
 
+            // Enable eircode input now that data is ready
+            updateEircodeInputState();
+
         } catch (error) {
             console.error('Error loading locations:', error);
             alert('Failed to load townland data. Please refresh the page.');
         }
     }
-    
+
+    // Update eircode input state based on loading status
+    function updateEircodeInputState() {
+        const eircodeInput = document.getElementById('eircodeInput');
+        if (!eircodeInput) return;
+
+        if (locationsLoaded) {
+            eircodeInput.disabled = false;
+            eircodeInput.placeholder = 'Enter your Eircode (e.g., A65 F4E2)';
+            eircodeInput.style.opacity = '1';
+        } else {
+            eircodeInput.disabled = true;
+            eircodeInput.placeholder = 'Loading location data...';
+            eircodeInput.style.opacity = '0.6';
+        }
+    }
+
     // Load locations when page loads
     loadLocations();
 
@@ -344,23 +368,55 @@
         return R * c;
     }
 
-    async function lookupEircodeViaGoogle(eircode) {
+    async function lookupEircodeViaGoogle(eircode, retryCount = 0) {
         /**
          * Look up eircode via backend proxy (secure - API key hidden).
          * Returns townland suggestion from Google's data.
          * Now includes distance filtering to avoid false matches.
+         * Includes automatic retry if locations aren't loaded yet.
          */
-        try {
-            // Call our backend worker (not Google directly!)
-            const response = await fetch(`${CONFIG.workerUrl}/lookup-eircode`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ eircode })
-            });
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY_MS = 1000; // 1 second between retries
 
-            if (!response.ok) {
-                console.warn('Backend lookup failed:', response.status);
-                return null;
+        try {
+            // Check for locations loaded FIRST (before calling API)
+            if (!locationsLoaded || locations.length === 0) {
+                if (retryCount < MAX_RETRIES) {
+                    console.log(`Locations not loaded yet, retrying in ${RETRY_DELAY_MS}ms (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+                    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+                    return lookupEircodeViaGoogle(eircode, retryCount + 1);
+                } else {
+                    console.warn('Locations still not loaded after retries');
+                    return { error: 'still_loading', message: 'Location data is still loading. Please try again in a moment.' };
+                }
+            }
+
+            // Call our backend worker (not Google directly!)
+            // Add timeout to handle slow API responses (Cloudflare Worker cold starts)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+            try {
+                const response = await fetch(`${CONFIG.workerUrl}/lookup-eircode`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ eircode }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    console.warn('Backend lookup failed:', response.status);
+                    return null;
+                }
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                if (fetchError.name === 'AbortError') {
+                    console.warn('Eircode lookup timed out after 10 seconds');
+                    return { error: 'timeout', message: 'The lookup request timed out. Please try again.' };
+                }
+                throw fetchError;
             }
 
             const data = await response.json();
@@ -389,12 +445,6 @@
 
             const googleTownland = townlandComponent.long_name;
             console.log('Google suggested townland:', googleTownland);
-
-            // Check for locations loaded
-            if (!locationsLoaded || locations.length === 0) {
-                console.warn('Locations not loaded yet');
-                return null;
-            }
 
             const MAX_DISTANCE_KM = 25;
 
@@ -472,6 +522,7 @@
     async function showTownlandSuggestion(eircode) {
         /**
          * Look up eircode and show suggestion to customer.
+         * Now handles retry logic and better error messages.
          */
         const suggestionDiv = document.getElementById('townlandSuggestion');
         if (!suggestionDiv) {
@@ -483,6 +534,36 @@
         suggestionDiv.classList.add('active');
 
         const result = await lookupEircodeViaGoogle(eircode);
+
+        // Handle "still loading" error
+        if (result && result.error === 'still_loading') {
+            suggestionDiv.innerHTML = `
+                <div class="suggestion-warning">
+                    <p>⏳ ${result.message}</p>
+                    <p>The location database is still loading. Please wait a few seconds and your eircode will be looked up automatically.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Handle timeout error
+        if (result && result.error === 'timeout') {
+            suggestionDiv.innerHTML = `
+                <div class="suggestion-warning">
+                    <p>⏱️ ${result.message}</p>
+                    <p>This can happen if the service is warming up. Please try entering your eircode again.</p>
+                    <button type="button" class="btn btn-change">Try Again</button>
+                </div>
+            `;
+
+            suggestionDiv.querySelector('.btn-change').addEventListener('click', function() {
+                suggestionDiv.classList.remove('active');
+                // Clear the input so user can re-enter
+                const eircodeInput = document.getElementById('eircodeInput');
+                eircodeInput.focus();
+            });
+            return;
+        }
 
         if (result && result.suggested) {
             const location = result.suggested;
@@ -714,7 +795,12 @@
     });
     
     // Eircode input - AUTO LOOKUP when complete
-    document.getElementById('eircodeInput').addEventListener('input', function(e) {
+    const eircodeInput = document.getElementById('eircodeInput');
+
+    // Set initial loading state
+    updateEircodeInputState();
+
+    eircodeInput.addEventListener('input', function(e) {
         let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
         // Format as A65 F4E2
@@ -724,9 +810,34 @@
 
         this.value = value;
 
-        // Auto-lookup when eircode is complete
+        // Auto-lookup when eircode is complete (only if locations are loaded)
         if (value.replace(/\s/g, '').length === 7) {
-            showTownlandSuggestion(value);
+            if (locationsLoaded) {
+                showTownlandSuggestion(value);
+            } else {
+                // Show loading message if locations aren't ready yet
+                const suggestionDiv = document.getElementById('townlandSuggestion');
+                if (suggestionDiv) {
+                    suggestionDiv.innerHTML = `
+                        <div class="suggestion-warning">
+                            <p>⏳ Loading location data...</p>
+                            <p>Please wait a moment while we load the townland database. Your eircode will be looked up automatically once ready.</p>
+                        </div>
+                    `;
+                    suggestionDiv.classList.add('active');
+                }
+                // Retry lookup after locations load
+                const checkInterval = setInterval(() => {
+                    if (locationsLoaded) {
+                        clearInterval(checkInterval);
+                        // Re-trigger lookup if eircode is still complete
+                        const currentValue = eircodeInput.value.replace(/\s/g, '');
+                        if (currentValue.length === 7) {
+                            showTownlandSuggestion(eircodeInput.value);
+                        }
+                    }
+                }, 500);
+            }
         } else {
             // Clear suggestion if editing
             const suggestionDiv = document.getElementById('townlandSuggestion');
