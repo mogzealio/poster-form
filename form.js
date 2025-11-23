@@ -396,8 +396,9 @@
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
+            let response;
             try {
-                const response = await fetch(`${CONFIG.workerUrl}/lookup-eircode`, {
+                response = await fetch(`${CONFIG.workerUrl}/lookup-eircode`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ eircode }),
