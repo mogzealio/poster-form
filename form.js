@@ -927,11 +927,11 @@
 
     // Frame preview images (placeholders for now)
     const framePreviewImages = {
-        none: 'https://mogzealio.github.io/poster-form/images/frame-none.jpg',
-        white: 'https://mogzealio.github.io/poster-form/images/frame-white.jpg',
-        black: 'https://mogzealio.github.io/poster-form/images/frame-black.jpg',
-        oak: 'https://mogzealio.github.io/poster-form/images/frame-oak.jpg',
-        premium_oak: 'https://mogzealio.github.io/poster-form/images/frame-premium-oak.jpg'
+        none: 'https://mogzealio.github.io/poster-form/images/frame-none.png',
+        white: 'https://mogzealio.github.io/poster-form/images/frame-white.png',
+        black: 'https://mogzealio.github.io/poster-form/images/frame-black.png',
+        oak: 'https://mogzealio.github.io/poster-form/images/frame-oak.png',
+        premium_oak: 'https://mogzealio.github.io/poster-form/images/frame-premium-oak.png'
     };
 
     const frameDescriptions = {
