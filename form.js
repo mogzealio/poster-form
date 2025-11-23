@@ -998,7 +998,7 @@
         // Use the color selected in step 3
         const imageUrl = getFramePreviewImage(frame, formState.color);
         previewContainer.style.backgroundImage = `url('${imageUrl}')`;
-        previewContainer.style.backgroundSize = 'contain';
+        previewContainer.style.backgroundSize = 'cover';
         previewContainer.style.backgroundPosition = 'center';
         previewContainer.style.backgroundRepeat = 'no-repeat';
 
