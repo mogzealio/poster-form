@@ -93,6 +93,33 @@
                 gbp: '£',
                 usd: '$',
                 aud: '$'
+            },
+
+            // Frame prices (size-dependent, EUR only for now)
+            framePrices: {
+                eur: {
+                    small: {  // A3
+                        none: 0,
+                        white: 25,
+                        black: 25,
+                        oak: 25,
+                        premium_oak: 50
+                    },
+                    medium: {  // A2
+                        none: 0,
+                        white: 35,
+                        black: 35,
+                        oak: 35,
+                        premium_oak: 75
+                    },
+                    large: {  // A1
+                        none: 0,
+                        white: 50,
+                        black: 50,
+                        oak: 50,
+                        premium_oak: 125
+                    }
+                }
             }
         };
     
@@ -108,6 +135,7 @@
         townlandDisplay: null, // For showing to customer
         size: null, // 'small', 'medium', 'large'
         color: null, // 'blue', 'green', 'red'
+        frame: null, // 'none', 'white', 'black', 'oak', 'premium_oak'
         shippingCountry: null, // 'IE', 'GB', 'EU', 'US', 'CA', 'AU'
         currency: 'eur' // 'eur', 'gbp', 'usd', 'aud' - defaults to EUR
     };
@@ -187,7 +215,12 @@
             const currency = formState.currency;
             return this.items.reduce((total, item) => {
                 const price = CONFIG.prices[currency][item.productType][item.size];
-                return total + price;
+                // Add frame price if applicable
+                let framePrice = 0;
+                if (item.frame && item.frame !== 'none' && CONFIG.framePrices[currency]) {
+                    framePrice = CONFIG.framePrices[currency][item.size][item.frame] || 0;
+                }
+                return total + price + framePrice;
             }, 0);
         },
 
@@ -199,17 +232,34 @@
             if (cartItems) {
                 cartItems.innerHTML = this.items.map((item, index) => {
                     const price = CONFIG.prices[currency][item.productType][item.size];
+
+                    // Add frame price if applicable
+                    let framePrice = 0;
+                    if (item.frame && item.frame !== 'none' && CONFIG.framePrices[currency]) {
+                        framePrice = CONFIG.framePrices[currency][item.size][item.frame] || 0;
+                    }
+
+                    const totalPrice = price + framePrice;
                     const sizeLabel = {small: 'A3', medium: 'A2', large: 'A1'}[item.size];
                     const typeLabel = item.productType === 'custom' ? 'Custom' : 'Standard';
                     const location = item.townlandDisplay ? ` - ${item.townlandDisplay}` : '';
+
+                    // Format frame name for display
+                    const frameNames = {
+                        white: 'White Frame',
+                        black: 'Black Frame',
+                        oak: 'Oak Frame',
+                        premium_oak: 'Premium Oak Frame'
+                    };
+                    const frameLabel = (item.frame && item.frame !== 'none') ? ` + ${frameNames[item.frame]}` : '';
 
                     return `
                         <div class="cart-item">
                             <div class="cart-item-details">
                                 <strong>${typeLabel} ${sizeLabel}</strong>
-                                <div class="cart-item-meta">${item.color}${location}</div>
+                                <div class="cart-item-meta">${item.color}${location}${frameLabel}</div>
                             </div>
-                            <div class="cart-item-price">${formatPrice(price, currency)}</div>
+                            <div class="cart-item-price">${formatPrice(totalPrice, currency)}</div>
                             <button type="button" class="cart-item-remove" data-index="${index}">✕</button>
                         </div>
                     `;
@@ -518,24 +568,24 @@
     function goToStep(step) {
         // Hide all steps
         document.querySelectorAll('.form-step').forEach(s => s.classList.remove('active'));
-        
+
         // Show target step
         document.querySelector(`.form-step[data-step="${step}"]`).classList.add('active');
-        
+
         // Update progress bar
         document.querySelectorAll('.progress-step').forEach((ps, index) => {
             const stepNum = index + 1;
             ps.classList.remove('active', 'completed');
-            
+
             if (stepNum < step) {
                 ps.classList.add('completed');
             } else if (stepNum === step) {
                 ps.classList.add('active');
             }
         });
-        
+
         formState.currentStep = step;
-        
+
         // Pre-select defaults when reaching step 3
         if (step === 3) {
             // Pre-select medium size if nothing selected
@@ -566,6 +616,24 @@
             if (toggleBtn) {
                 toggleBtn.style.display = formState.productType === 'custom' ? 'inline-block' : 'none';
             }
+        } else if (step === 4) {
+            // Initialize step 4 - framing
+            // Update frame price displays based on selected size
+            updateFramePriceDisplays();
+
+            // Pre-select "none" if nothing selected
+            if (!formState.frame) {
+                formState.frame = 'none';
+                const noneOption = document.querySelector('[data-frame="none"]');
+                if (noneOption) {
+                    noneOption.classList.add('selected');
+                }
+                updateFramePreview('none');
+            }
+
+            // Update price breakdown
+            updatePriceBreakdown();
+            updateStep4Button();
         } else {
             // Hide preview button when not on step 3
             const toggleBtn = document.getElementById('togglePreviewBtn');
@@ -579,7 +647,7 @@
                 prevSection.style.display = 'none';
             }
         }
-        
+
         // Scroll to the form container (not page top)
         const container = document.querySelector('.poster-form-container');
         if (container) {
@@ -836,10 +904,10 @@
     }
     
     function updateStep3Button() {
-        const btn = document.getElementById('step3Checkout');
+        const btn = document.getElementById('step3Continue');
         btn.disabled = !(formState.size && formState.color);
     }
-    
+
     document.getElementById('step3Back').addEventListener('click', () => {
         if (formState.productType === 'custom') {
             goToStep(2);
@@ -847,18 +915,112 @@
             goToStep(1);
         }
     });
-    
+
+    // Step 3 Continue button - go to framing step
+    document.getElementById('step3Continue').addEventListener('click', () => {
+        goToStep(4);
+    });
+
     // ============================================
-    // CART & CHECKOUT
+    // STEP 4: FRAMING
     // ============================================
 
-    // Add to Cart button
-    document.getElementById('step3Checkout').addEventListener('click', () => {
+    // Frame preview images (placeholders for now)
+    const framePreviewImages = {
+        none: 'https://mogzealio.github.io/poster-form/images/frame-none.jpg',
+        white: 'https://mogzealio.github.io/poster-form/images/frame-white.jpg',
+        black: 'https://mogzealio.github.io/poster-form/images/frame-black.jpg',
+        oak: 'https://mogzealio.github.io/poster-form/images/frame-oak.jpg',
+        premium_oak: 'https://mogzealio.github.io/poster-form/images/frame-premium-oak.jpg'
+    };
+
+    const frameDescriptions = {
+        none: 'Poster only - perfect for custom framing',
+        white: 'Classic white wood frame with acrylic glazing',
+        black: 'Elegant black wood frame with acrylic glazing',
+        oak: 'Natural oak wood frame with acrylic glazing',
+        premium_oak: 'Solid oak frame with museum-grade acrylic glazing'
+    };
+
+    // Update frame price displays based on selected size
+    function updateFramePriceDisplays() {
+        if (!formState.size) return;
+
+        const currency = formState.currency;
+        const size = formState.size;
+
+        // Only update if we have frame prices for this currency
+        if (!CONFIG.framePrices[currency]) return;
+
+        const framePrices = CONFIG.framePrices[currency][size];
+
+        // Update each frame option's price display
+        Object.keys(framePrices).forEach(frameType => {
+            const priceElement = document.getElementById(`framePrice-${frameType}`);
+            if (priceElement) {
+                const price = framePrices[frameType];
+                priceElement.textContent = price === 0 ? '+€0' : `+${formatPrice(price, currency)}`;
+            }
+        });
+    }
+
+    // Frame option selection
+    document.querySelectorAll('.frame-option').forEach(option => {
+        option.addEventListener('click', function() {
+            document.querySelectorAll('.frame-option').forEach(o => o.classList.remove('selected'));
+            this.classList.add('selected');
+            formState.frame = this.dataset.frame;
+            updateFramePreview(this.dataset.frame);
+            updatePriceBreakdown();
+            updateStep4Button();
+        });
+    });
+
+    function updateFramePreview(frame) {
+        const previewContainer = document.getElementById('framePreview');
+        const descriptionDiv = document.getElementById('frameDescription');
+
+        if (framePreviewImages[frame]) {
+            previewContainer.style.backgroundImage = `url('${framePreviewImages[frame]}')`;
+        }
+        descriptionDiv.textContent = frameDescriptions[frame] || 'Select a frame to see preview';
+    }
+
+    function updatePriceBreakdown() {
+        if (!formState.productType || !formState.size) return;
+
+        const currency = formState.currency;
+        const printPrice = CONFIG.prices[currency][formState.productType][formState.size];
+
+        let framePrice = 0;
+        if (formState.frame && CONFIG.framePrices[currency]) {
+            framePrice = CONFIG.framePrices[currency][formState.size][formState.frame] || 0;
+        }
+
+        const total = printPrice + framePrice;
+
+        document.getElementById('printPrice').textContent = formatPrice(printPrice, currency);
+        document.getElementById('framePrice').textContent = formatPrice(framePrice, currency);
+        document.getElementById('totalPrice').textContent = formatPrice(total, currency);
+    }
+
+    function updateStep4Button() {
+        const btn = document.getElementById('step4AddToCart');
+        btn.disabled = !formState.frame;
+    }
+
+    // Step 4 navigation
+    document.getElementById('step4Back').addEventListener('click', () => {
+        goToStep(3);
+    });
+
+    document.getElementById('step4AddToCart').addEventListener('click', () => {
         // Add current selection to cart
         const cartItem = {
             productType: formState.productType,
             size: formState.size,
             color: formState.color,
+            frame: formState.frame,
             townlandId: formState.locationValue,
             townlandDisplay: formState.townlandDisplay
         };
@@ -868,6 +1030,10 @@
         // Show success message and cart options
         showCartOptions();
     });
+
+    // ============================================
+    // CART & CHECKOUT
+    // ============================================
 
     function showCartOptions() {
         // Hide Step 3, show cart options screen
@@ -890,15 +1056,55 @@
             formState.townlandDisplay = null;
             formState.size = null;
             formState.color = null;
+            formState.frame = null;
 
             // Clear selections
-            document.querySelectorAll('[data-product], .size-option, .color-option').forEach(el => {
+            document.querySelectorAll('[data-product], .size-option, .color-option, .frame-option').forEach(el => {
                 el.classList.remove('selected');
             });
 
             // Go back to Step 1
             goToStep(1);
         });
+    }
+
+    // Update shipping options based on framed items
+    function updateShippingOptions() {
+        const hasFramedItems = cart.items.some(item => item.frame && item.frame !== 'none');
+        const shippingCards = document.querySelectorAll('#shippingSelection .option-card');
+
+        shippingCards.forEach(card => {
+            const country = card.dataset.country;
+
+            if (hasFramedItems && country !== 'IE') {
+                // Disable non-Ireland options if framed
+                card.classList.add('disabled');
+
+                // Add explanation text if not already present
+                if (!card.querySelector('.disabled-reason')) {
+                    const reason = document.createElement('p');
+                    reason.className = 'disabled-reason';
+                    reason.textContent = 'Framed prints ship to Ireland only';
+                    card.appendChild(reason);
+                }
+            } else {
+                // Re-enable if user removed framed items
+                card.classList.remove('disabled');
+
+                const reason = card.querySelector('.disabled-reason');
+                if (reason) reason.remove();
+            }
+        });
+
+        // If already selected non-IE option with framed items, deselect it
+        if (hasFramedItems && formState.shippingCountry && formState.shippingCountry !== 'IE') {
+            formState.shippingCountry = null;
+            shippingCards.forEach(c => c.classList.remove('selected'));
+            const checkoutBtn = document.getElementById('proceedToCheckout');
+            if (checkoutBtn) {
+                checkoutBtn.disabled = true;
+            }
+        }
     }
 
     // Proceed to Shipping button (from cart)
@@ -916,6 +1122,9 @@
             if (shippingStep && cartStep) {
                 cartStep.classList.remove('active');
                 shippingStep.classList.add('active');
+
+                // Update shipping restrictions based on framed items
+                updateShippingOptions();
             }
         });
     }
