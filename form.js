@@ -936,10 +936,10 @@
 
     const frameDescriptions = {
         none: 'Poster only - rolled in tissue, plastic-free packing',
-        white: 'White painted solid wood frame with glass glazing',
-        black: 'Black painted solid wood frame with glass glazing',
-        oak: 'Oak-venner solid wood frame with glass glazing',
-        premium_oak: 'Solid oak frame with floated print & glass glazing'
+        white: 'White-painted solid-wood frame, edge-to-edge framed & glass glazing',
+        black: 'Black-painted solid-wood frame, edge-to-edge framed & glazing',
+        oak: 'Oak-venner solid-wood frame, edge-to-edge framed & glass glazing',
+        premium_oak: 'Solid-oak frame with floated print & glass glazing'
     };
 
     // Update frame price displays based on selected size
