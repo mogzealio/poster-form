@@ -334,14 +334,66 @@
         const eircodeInput = document.getElementById('eircodeInput');
         if (!eircodeInput) return;
 
+        // Get or create loading message element
+        let loadingMessage = document.getElementById('eircodeLoadingMessage');
+
         if (locationsLoaded) {
             eircodeInput.disabled = false;
             eircodeInput.placeholder = 'Enter your Eircode (e.g., A65 F4E2)';
             eircodeInput.style.opacity = '1';
+
+            // Hide loading message
+            if (loadingMessage) {
+                loadingMessage.style.display = 'none';
+            }
         } else {
             eircodeInput.disabled = true;
             eircodeInput.placeholder = 'Loading location data...';
             eircodeInput.style.opacity = '0.6';
+
+            // Create and show loading message with animated ellipsis
+            if (!loadingMessage) {
+                loadingMessage = document.createElement('div');
+                loadingMessage.id = 'eircodeLoadingMessage';
+                loadingMessage.style.cssText = `
+                    margin-top: 8px;
+                    padding: 8px 12px;
+                    background: rgba(90, 111, 100, 0.1);
+                    border: 1px solid #5a6f64;
+                    border-radius: 4px;
+                    color: #B8B8A8;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                `;
+                loadingMessage.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 16 16" style="animation: spin 1s linear infinite;">
+                        <circle cx="8" cy="8" r="6" fill="none" stroke="#7fb069" stroke-width="2" stroke-dasharray="10 20" />
+                    </svg>
+                    <span>Loading townland database<span class="loading-dots"></span></span>
+                    <style>
+                        @keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                        @keyframes dots {
+                            0%, 20% { content: ''; }
+                            40% { content: '.'; }
+                            60% { content: '..'; }
+                            80%, 100% { content: '...'; }
+                        }
+                        .loading-dots::after {
+                            content: '';
+                            animation: dots 1.5s steps(1, end) infinite;
+                        }
+                    </style>
+                `;
+
+                // Insert after the eircode input
+                eircodeInput.parentNode.insertBefore(loadingMessage, eircodeInput.nextSibling);
+            } else {
+                loadingMessage.style.display = 'flex';
+            }
         }
     }
 
