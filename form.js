@@ -925,21 +925,36 @@
     // STEP 4: FRAMING
     // ============================================
 
-    // Frame preview images (placeholders for now)
-    const framePreviewImages = {
-        none: 'https://mogzealio.github.io/poster-form/images/frame-none.png',
-        white: 'https://mogzealio.github.io/poster-form/images/frame-white.png',
-        black: 'https://mogzealio.github.io/poster-form/images/frame-black.png',
-        oak: 'https://mogzealio.github.io/poster-form/images/frame-oak.png',
-        premium_oak: 'https://mogzealio.github.io/poster-form/images/frame-premium-oak.png'
-    };
+    // Frame preview images - color-specific (16 total: 4 frames × 4 colors)
+    // Image naming: frame-{frameType}-{color}.png
+    // e.g., frame-white-sailboat.png, frame-oak-mossy.png
+    function getFramePreviewImage(frameType, color) {
+        // Map color codes to image filenames
+        const colorMap = {
+            'default': 'sailboat',
+            'green': 'mossy',
+            'rhubarb': 'rhubarb',
+            'slate': 'slate'
+        };
+
+        const colorName = colorMap[color] || 'sailboat';
+        const baseUrl = 'https://mogzealio.github.io/poster-form/images/';
+
+        if (frameType === 'none') {
+            // No frame - just show the poster in selected color
+            return `${baseUrl}frame-none-${colorName}.png`;
+        }
+
+        // Frame types: white, black, oak, premium_oak
+        return `${baseUrl}frame-${frameType}-${colorName}.png`;
+    }
 
     const frameDescriptions = {
         none: 'Poster only - rolled in tissue, plastic-free packing',
-        white: 'White-painted solid-wood frame, edge-to-edge framed & glass glazing',
-        black: 'Black-painted solid-wood frame, edge-to-edge framed & glazing',
-        oak: 'Oak-venner solid-wood frame, edge-to-edge framed & glass glazing',
-        premium_oak: 'Solid-oak frame with floated print & glass glazing'
+        white: 'White painted solid wood frame with glass glazing',
+        black: 'Black painted solid wood frame with glass glazing',
+        oak: 'Oak-venner solid wood frame with glass glazing',
+        premium_oak: 'Solid oak frame with floated print & glass glazing'
     };
 
     // Update frame price displays based on selected size
@@ -980,9 +995,13 @@
         const previewContainer = document.getElementById('framePreview');
         const descriptionDiv = document.getElementById('frameDescription');
 
-        if (framePreviewImages[frame]) {
-            previewContainer.style.backgroundImage = `url('${framePreviewImages[frame]}')`;
-        }
+        // Use the color selected in step 3
+        const imageUrl = getFramePreviewImage(frame, formState.color);
+        previewContainer.style.backgroundImage = `url('${imageUrl}')`;
+        previewContainer.style.backgroundSize = 'contain';
+        previewContainer.style.backgroundPosition = 'center';
+        previewContainer.style.backgroundRepeat = 'no-repeat';
+
         descriptionDiv.textContent = frameDescriptions[frame] || 'Select a frame to see preview';
     }
 
@@ -998,6 +1017,16 @@
         }
 
         const total = printPrice + framePrice;
+
+        // Display color name
+        const colorNames = {
+            'default': 'Sailboat',
+            'green': 'Mossy',
+            'rhubarb': 'Rhubarb',
+            'slate': 'Slate'
+        };
+        const colorDisplay = colorNames[formState.color] || formState.color || '--';
+        document.getElementById('selectedColor').textContent = colorDisplay;
 
         document.getElementById('printPrice').textContent = formatPrice(printPrice, currency);
         document.getElementById('framePrice').textContent = formatPrice(framePrice, currency);
