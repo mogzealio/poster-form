@@ -936,10 +936,10 @@
 
     const frameDescriptions = {
         none: 'Poster only - perfect for custom framing',
-        white: 'Classic white wood frame with acrylic glazing',
-        black: 'Elegant black wood frame with acrylic glazing',
-        oak: 'Natural oak wood frame with acrylic glazing',
-        premium_oak: 'Solid oak frame with museum-grade acrylic glazing'
+        white: 'White painted solid wood frame with glass glazing',
+        black: 'Black painted solid wood frame with glass glazing',
+        oak: 'Oak-venner solid wood frame with glass glazing',
+        premium_oak: 'Solid oak frame with floated print & glass glazing'
     };
 
     // Update frame price displays based on selected size
