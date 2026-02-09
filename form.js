@@ -100,24 +100,21 @@
                 eur: {
                     small: {  // A3
                         none: 0,
-                        white: 25,
-                        black: 25,
-                        oak: 25,
-                        premium_oak: 50
+                        white: 65,
+                        black: 65,
+                        oak: 65
                     },
                     medium: {  // A2
                         none: 0,
-                        white: 35,
-                        black: 35,
-                        oak: 35,
-                        premium_oak: 75
+                        white: 90,
+                        black: 90,
+                        oak: 90
                     },
                     large: {  // A1
                         none: 0,
-                        white: 50,
-                        black: 50,
-                        oak: 50,
-                        premium_oak: 125
+                        white: 125,
+                        black: 125,
+                        oak: 125
                     }
                 }
             }
@@ -246,10 +243,9 @@
 
                     // Format frame name for display
                     const frameNames = {
-                        white: 'White Frame',
-                        black: 'Black Frame',
-                        oak: 'Oak Frame',
-                        premium_oak: 'Premium Oak Frame'
+                        white: 'Lime White Frame',
+                        black: 'Charcoal Black Frame',
+                        oak: 'Natural Oak Frame'
                     };
                     const frameLabel = (item.frame && item.frame !== 'none') ? ` + ${frameNames[item.frame]}` : '';
 
@@ -1115,10 +1111,9 @@
 
     const frameDescriptions = {
         none: 'Poster only - rolled in tissue, plastic-free packing',
-        white: 'White painted solid wood frame with glass glazing',
-        black: 'Black painted solid wood frame with glass glazing',
-        oak: 'Oak-effect on solid wood frame with glass glazing',
-        premium_oak: 'Solid oak frame with floated print & glass glazing'
+        white: 'Lime white painted solid wood frame with glass glazing',
+        black: 'Charcoal black painted solid wood frame with glass glazing',
+        oak: 'Natural oak-veneered solid wood frame with glass glazing'
     };
 
     // Update frame price displays based on selected size
