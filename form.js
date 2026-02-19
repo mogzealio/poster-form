@@ -1259,9 +1259,6 @@
         // Use the color selected in step 3
         const imageUrl = getFramePreviewImage(frame, formState.color);
         previewContainer.style.backgroundImage = `url('${imageUrl}')`;
-        previewContainer.style.backgroundSize = 'cover';
-        previewContainer.style.backgroundPosition = 'center';
-        previewContainer.style.backgroundRepeat = 'no-repeat';
 
         descriptionDiv.textContent = frameDescriptions[frame] || 'Select a frame to see preview';
     }
@@ -1297,6 +1294,7 @@
     function updateStep4Button() {
         const btn = document.getElementById('step4AddToCart');
         btn.disabled = !formState.frame;
+        btn.textContent = (formState.frame && formState.frame !== 'none') ? 'Add to Cart' : 'Continue';
     }
 
     // Step 4 navigation
@@ -1822,7 +1820,9 @@
                     size: formState.size,
                     color: formState.color === 'default' ? 'green' : formState.color,
                     customer_email: customerEmail,
-                    opt_in_marketing: previewOptIn.checked
+                    opt_in_marketing: previewOptIn.checked,
+                    marker_lon: (formState.productType === 'cluster' && formState.markerLon) ? formState.markerLon : undefined,
+                    marker_lat: (formState.productType === 'cluster' && formState.markerLat) ? formState.markerLat : undefined
                 };
 
                 console.log('Sending preview request:', previewRequest);
