@@ -71,19 +71,23 @@
             prices: {
                 eur: {
                     standard: { small: 30, medium: 35, large: 45 },
-                    custom: { small: 35, medium: 45, large: 55 }
+                    custom: { small: 35, medium: 45, large: 55 },
+                    cluster: { small: 35, medium: 45, large: 55 }
                 },
                 gbp: {
                     standard: { small: 26, medium: 30, large: 38 },
-                    custom: { small: 30, medium: 38, large: 47 }
+                    custom: { small: 30, medium: 38, large: 47 },
+                    cluster: { small: 30, medium: 38, large: 47 }
                 },
                 usd: {
                     standard: { small: 33, medium: 38, large: 50 },
-                    custom: { small: 38, medium: 50, large: 60 }
+                    custom: { small: 38, medium: 50, large: 60 },
+                    cluster: { small: 38, medium: 50, large: 60 }
                 },
                 aud: {
                     standard: { small: 69, medium: 88, large: 100 },
-                    custom: { small: 80, medium: 113, large: 122 }
+                    custom: { small: 80, medium: 113, large: 122 },
+                    cluster: { small: 80, medium: 113, large: 122 }
                 }
             },
 
@@ -133,6 +137,8 @@
         size: null, // 'small', 'medium', 'large'
         color: null, // 'blue', 'green', 'red'
         frame: null, // 'none', 'white', 'black', 'oak', 'premium_oak'
+        markerLon: null, // Eircode longitude (for cluster marker)
+        markerLat: null, // Eircode latitude (for cluster marker)
         shippingCountry: null, // 'IE', 'GB', 'EU', 'US', 'CA', 'AU'
         currency: 'eur' // 'eur', 'gbp', 'usd', 'aud' - defaults to EUR
     };
@@ -164,14 +170,15 @@
     function updatePriceDisplays() {
         const currency = formState.currency;
 
-        // Update option cards on step 1
-        const standardCard = document.querySelector('[data-product="standard"] .price');
-        const customCard = document.querySelector('[data-product="custom"] .price');
-        if (standardCard) {
-            standardCard.textContent = `From ${formatPrice(CONFIG.prices[currency].standard.small, currency)} + postage`;
-        }
-        if (customCard) {
-            customCard.textContent = `From ${formatPrice(CONFIG.prices[currency].custom.small, currency)} + postage`;
+        // Update carousel price on step 1
+        const carouselEl = document.querySelector('.carousel');
+        if (carouselEl && typeof currentSlide !== 'undefined' && typeof carouselSlides !== 'undefined') {
+            const slide = carouselSlides[currentSlide];
+            const price = CONFIG.prices[currency][slide.product].small;
+            const priceEl = carouselEl.querySelector('.carousel-price');
+            if (priceEl) {
+                priceEl.textContent = `From ${formatPrice(price, currency)} + postage`;
+            }
         }
 
         // Update price display on step 3 if size is selected
@@ -238,7 +245,7 @@
 
                     const totalPrice = price + framePrice;
                     const sizeLabel = {small: 'A3', medium: 'A2', large: 'A1'}[item.size];
-                    const typeLabel = item.productType === 'custom' ? 'Custom' : 'Standard';
+                    const typeLabel = {custom: 'Custom', cluster: 'Cluster', standard: 'Standard'}[item.productType] || 'Standard';
                     const location = item.townlandDisplay ? ` - ${item.townlandDisplay}` : '';
 
                     // Format frame name for display
@@ -525,7 +532,9 @@
                     googleName: googleTownland,
                     allMatches: exactMatches.slice(0, 5).map(loc => ({ item: loc })),
                     distance: distance,
-                    matchType: 'exact' // Exact name match
+                    matchType: 'exact', // Exact name match
+                    googleLat: googleLat,
+                    googleLng: googleLng
                 };
             }
 
@@ -555,7 +564,9 @@
                     googleName: googleTownland,
                     allMatches: allNearby.slice(0, 5).map(item => ({ item: item.location })),
                     distance: nearest.distance,
-                    matchType: 'geographic' // Matched by location only
+                    matchType: 'geographic', // Matched by location only
+                    googleLat: googleLat,
+                    googleLng: googleLng
                 };
             }
 
@@ -657,6 +668,12 @@
                 formState.locationValue = location.id; // Custom ID for backend!
                 formState.townlandDisplay = location.display; // For display
 
+                // Capture eircode coords for cluster marker
+                if (result.googleLat !== undefined && result.googleLng !== undefined) {
+                    formState.markerLat = result.googleLat;
+                    formState.markerLon = result.googleLng;
+                }
+
                 console.log('Customer confirmed townland:', location.id);
 
                 updateStep2Button();
@@ -744,7 +761,7 @@
             // Show preview button for custom posters
             const toggleBtn = document.getElementById('togglePreviewBtn');
             if (toggleBtn) {
-                toggleBtn.style.display = formState.productType === 'custom' ? 'inline-block' : 'none';
+                toggleBtn.style.display = (formState.productType === 'custom' || formState.productType === 'cluster') ? 'inline-block' : 'none';
             }
         } else if (step === 4) {
             // Initialize step 4 - framing
@@ -786,25 +803,104 @@
     }
     
     // ============================================
-    // STEP 1: PRODUCT TYPE
+    // STEP 1: PRODUCT TYPE (Carousel)
     // ============================================
-    
-    document.querySelectorAll('[data-product]').forEach(card => {
-        card.addEventListener('click', function() {
-            // Deselect all
-            document.querySelectorAll('[data-product]').forEach(c => c.classList.remove('selected'));
-            
-            // Select this one
-            this.classList.add('selected');
-            formState.productType = this.dataset.product;
-            
-            // Enable continue button
-            document.getElementById('step1Next').disabled = false;
+
+    const carouselSlides = [
+        {
+            product: 'custom',
+            title: 'Your Townland on a Map',
+            description: 'Your townland highlighted among all of Ireland\'s 61,000+ townlands. Three sizes and four colour options.',
+            image: 'https://mogzealio.github.io/poster-form/images/framed_into_image_custom.png'
+        },
+        {
+            product: 'cluster',
+            title: 'Your Townland & Its Neighbours',
+            description: 'Just your townland and its neighbours, optionally showing your home location. Three sizes and four colour options.',
+            image: 'https://mogzealio.github.io/poster-form/images/framed_into_image_cluster.png'
+        },
+        {
+            product: 'standard',
+            title: 'Standard townland map',
+            description: 'Ireland\'s 61,000+ townlands without highlighting any particular one. Three sizes and four colour options.',
+            image: 'https://mogzealio.github.io/poster-form/images/framed_into_image_standard.png'
+        }
+    ];
+
+    let currentSlide = 0;
+
+    function showCarouselSlide() {
+        const slide = carouselSlides[currentSlide];
+        const carousel = document.querySelector('.carousel');
+        carousel.querySelector('.carousel-image').src = slide.image;
+        carousel.querySelector('.carousel-title').textContent = slide.title;
+        carousel.querySelector('.carousel-description').textContent = slide.description;
+        const currency = formState.currency;
+        carousel.querySelector('.carousel-price').textContent =
+            `From ${formatPrice(CONFIG.prices[currency][slide.product].small, currency)} + postage`;
+        carousel.querySelectorAll('.carousel-dot').forEach((dot, i) => {
+            dot.classList.toggle('active', i === currentSlide);
         });
-    });
-    
+    }
+
+    function selectCarouselSlide() {
+        showCarouselSlide();
+        const carousel = document.querySelector('.carousel');
+        carousel.classList.add('selected');
+        formState.productType = carouselSlides[currentSlide].product;
+        document.getElementById('step1Next').disabled = false;
+    }
+
+    // Initialize carousel
+    (function initCarousel() {
+        const dotsContainer = document.querySelector('.carousel-dots');
+        if (!dotsContainer) return;
+
+        carouselSlides.forEach((_, i) => {
+            const dot = document.createElement('button');
+            dot.type = 'button';
+            dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+            dot.setAttribute('aria-label', `Slide ${i + 1}`);
+            dot.addEventListener('click', (e) => {
+                e.stopPropagation();
+                currentSlide = i;
+                selectCarouselSlide();
+            });
+            dotsContainer.appendChild(dot);
+        });
+
+        // Arrow handlers
+        const leftArrow = document.querySelector('.carousel-arrow-left');
+        const rightArrow = document.querySelector('.carousel-arrow-right');
+        if (leftArrow) {
+            leftArrow.addEventListener('click', (e) => {
+                e.stopPropagation();
+                currentSlide = (currentSlide - 1 + carouselSlides.length) % carouselSlides.length;
+                selectCarouselSlide();
+            });
+        }
+        if (rightArrow) {
+            rightArrow.addEventListener('click', (e) => {
+                e.stopPropagation();
+                currentSlide = (currentSlide + 1) % carouselSlides.length;
+                selectCarouselSlide();
+            });
+        }
+
+        // Clicking carousel body selects current slide
+        const carousel = document.querySelector('.carousel');
+        if (carousel) {
+            carousel.addEventListener('click', () => {
+                selectCarouselSlide();
+            });
+        }
+
+        // Show and select first slide
+        selectCarouselSlide();
+    })();
+
     document.getElementById('step1Next').addEventListener('click', () => {
-        if (formState.productType === 'custom') {
+        if (formState.productType === 'custom' || formState.productType === 'cluster') {
             goToStep(2);
         } else {
             goToStep(3);
@@ -1033,6 +1129,12 @@
             'green': 'https://mogzealio.github.io/poster-form/images/custom-mossy-preview-02.jpg',
             'rhubarb': 'https://mogzealio.github.io/poster-form/images/custom-rhubarb-preview-03.jpg',
             'slate': 'https://mogzealio.github.io/poster-form/images/custom-slate-preview.jpg'
+        },
+        cluster: {
+            'default': 'https://mogzealio.github.io/poster-form/images/poster_preview_cluster_sailboat.jpg',
+            'green': 'https://mogzealio.github.io/poster-form/images/poster_preview_cluster_mossy.jpg',
+            'rhubarb': 'https://mogzealio.github.io/poster-form/images/poster_preview_cluster_rhubarb.jpg',
+            'slate': 'https://mogzealio.github.io/poster-form/images/poster_preview_cluster_slate.jpg'
         }
     };
     
@@ -1069,7 +1171,7 @@
     }
 
     document.getElementById('step3Back').addEventListener('click', () => {
-        if (formState.productType === 'custom') {
+        if (formState.productType === 'custom' || formState.productType === 'cluster') {
             goToStep(2);
         } else {
             goToStep(1);
@@ -1210,7 +1312,9 @@
             color: formState.color,
             frame: formState.frame,
             townlandId: formState.locationValue,
-            townlandDisplay: formState.townlandDisplay
+            townlandDisplay: formState.townlandDisplay,
+            markerLon: (formState.productType === 'cluster' && formState.markerLon) ? formState.markerLon : null,
+            markerLat: (formState.productType === 'cluster' && formState.markerLat) ? formState.markerLat : null
         };
 
         cart.addItem(cartItem);
@@ -1245,6 +1349,8 @@
             formState.size = null;
             formState.color = null;
             formState.frame = null;
+            formState.markerLon = null;
+            formState.markerLat = null;
 
             // Clear selections
             document.querySelectorAll('[data-product], .size-option, .color-option, .frame-option').forEach(el => {
@@ -1568,7 +1674,7 @@
         if (!previewSection) return;
 
         // Only show for custom product type
-        const showPreview = formState.productType === 'custom';
+        const showPreview = formState.productType === 'custom' || formState.productType === 'cluster';
         previewSection.style.display = showPreview ? 'block' : 'none';
     }
 
@@ -1674,8 +1780,8 @@
 
             try {
                 // Validate we're on custom product type
-                if (formState.productType !== 'custom') {
-                    throw new Error('Preview is only available for custom posters');
+                if (formState.productType !== 'custom' && formState.productType !== 'cluster') {
+                    throw new Error('Preview is only available for custom and cluster posters');
                 }
 
                 // Validate required fields from formState
@@ -1712,6 +1818,7 @@
                 const previewRequest = {
                     townland_id: formState.locationValue,
                     townland_display: formState.townlandDisplay,
+                    product_type: formState.productType,
                     size: formState.size,
                     color: formState.color === 'default' ? 'green' : formState.color,
                     customer_email: customerEmail,
