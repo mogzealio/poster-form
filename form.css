@@ -621,7 +621,7 @@ margin-bottom: 20px;
 
 .frame-preview-container {
 width: 100%;
-height: 400px;
+aspect-ratio: 2 / 1;
 border-radius: 12px;
 overflow: hidden;
 margin-bottom: 15px;
