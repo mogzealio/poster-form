@@ -1642,7 +1642,8 @@
         const previewHTML = `
 <div style="margin: 20px 0; padding: 20px; background: rgba(90, 111, 100, 0.1); border: 1px solid #5a6f64; border-radius: 8px;">
 <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #DEDED3;">Get a Preview First</h3>
-<p id="previewDescription" style="margin: 0 0 15px 0; font-size: 14px; color: #B8B8A8; line-height: 1.5;">Enter your email to receive a preview before purchasing.</p>
+<p id="previewDescription" style="margin: 0 0 5px 0; font-size: 14px; color: #B8B8A8; line-height: 1.5;">Enter your email to receive a preview before purchasing.</p>
+<p style="margin: 0 0 15px 0; font-size: 13px; color: #8a8a7a; line-height: 1.5;">You can request up to 3 previews in a 24 hour period.</p>
 <form id="previewForm">
 <div class="form-group">
 <label for="previewEmail" style="display: block; margin-bottom: 5px; font-size: 14px; color: #DEDED3;">Email Address *</label>
@@ -1860,11 +1861,14 @@
                 // Record the request in localStorage
                 recordPreviewRequest(customerEmail);
 
-                // Disable the preview button for this session
+                // Disable the preview button only if all 3 previews used
+                const postCheck = checkPreviewCooldown(customerEmail);
                 if (togglePreviewBtn) {
-                    togglePreviewBtn.disabled = true;
-                    togglePreviewBtn.textContent = 'Preview Requested';
-                    togglePreviewBtn.style.opacity = '0.6';
+                    if (!postCheck.allowed) {
+                        togglePreviewBtn.disabled = true;
+                        togglePreviewBtn.textContent = 'Preview Limit Reached';
+                        togglePreviewBtn.style.opacity = '0.6';
+                    }
                 }
 
                 // Show success message
