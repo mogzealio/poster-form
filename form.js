@@ -1880,6 +1880,9 @@
                     if (previewSection) {
                         previewSection.style.display = 'none';
                     }
+                    if (togglePreviewBtn && !togglePreviewBtn.disabled) {
+                        togglePreviewBtn.textContent = 'Get a Preview';
+                    }
                     previewForm.reset();
                     previewSuccess.style.display = 'none';
                 }, 3000);
