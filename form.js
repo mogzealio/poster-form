@@ -1678,23 +1678,29 @@
 
     // Rate limiting helpers (client-side)
     const PREVIEW_COOLDOWN_HOURS = 24;
+    const PREVIEW_MAX_REQUESTS = 3;
 
     function checkPreviewCooldown(email) {
         try {
-            const key = `preview_request_${email.toLowerCase()}`;
-            const timestamp = localStorage.getItem(key);
+            const key = `preview_requests_${email.toLowerCase()}`;
+            const stored = localStorage.getItem(key);
 
-            if (!timestamp) return { allowed: true };
+            if (!stored) return { allowed: true };
 
-            const requestTime = parseInt(timestamp);
+            const timestamps = JSON.parse(stored);
             const now = Date.now();
-            const hoursAgo = (now - requestTime) / (1000 * 60 * 60);
+            const cutoff = now - (PREVIEW_COOLDOWN_HOURS * 60 * 60 * 1000);
 
-            if (hoursAgo < PREVIEW_COOLDOWN_HOURS) {
-                const hoursRemaining = Math.ceil(PREVIEW_COOLDOWN_HOURS - hoursAgo);
+            // Keep only timestamps within the 24h window
+            const recent = timestamps.filter(t => t > cutoff);
+
+            if (recent.length >= PREVIEW_MAX_REQUESTS) {
+                const oldest = Math.min(...recent);
+                const msRemaining = (oldest + PREVIEW_COOLDOWN_HOURS * 60 * 60 * 1000) - now;
+                const hoursRemaining = Math.ceil(msRemaining / (1000 * 60 * 60));
                 return {
                     allowed: false,
-                    message: `Preview already requested. Please wait ${hoursRemaining} hour(s) before requesting another. Thanks!`
+                    message: `Three previews already requested. Please wait ${hoursRemaining} hour(s) before requesting another. Thanks!`
                 };
             }
 
@@ -1707,8 +1713,17 @@
 
     function recordPreviewRequest(email) {
         try {
-            const key = `preview_request_${email.toLowerCase()}`;
-            localStorage.setItem(key, Date.now().toString());
+            const key = `preview_requests_${email.toLowerCase()}`;
+            const stored = localStorage.getItem(key);
+            const now = Date.now();
+            const cutoff = now - (PREVIEW_COOLDOWN_HOURS * 60 * 60 * 1000);
+
+            let timestamps = stored ? JSON.parse(stored) : [];
+            // Prune expired entries and add the new one
+            timestamps = timestamps.filter(t => t > cutoff);
+            timestamps.push(now);
+
+            localStorage.setItem(key, JSON.stringify(timestamps));
         } catch (e) {
             // Ignore localStorage errors
             console.warn('Could not save preview request to localStorage');
